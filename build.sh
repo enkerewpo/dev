@@ -192,14 +192,18 @@ build_nix_rootfs() {
     mkdir -p "${NIX_ROOTFS_DIR}"
     
     # Build the rootfs using Nix with experimental features enabled
-    if ! nix build --impure --extra-experimental-features 'nix-command flakes' ".#" --out-link "${NIX_ROOTFS_DIR}/result"; then
+    if ! nix build --impure --extra-experimental-features 'nix-command flakes' ".#" --out-link "${NIX_ROOTFS_DIR}/rootfs.ext4"; then
         die "Failed to build Nix rootfs"
     fi
     
-    # Copy the result to a more accessible location
-    cp -r "${NIX_ROOTFS_DIR}/result"/* "${NIX_ROOTFS_DIR}/rootfs"
+    # print size of the rootfs, since this is a link, we need to get the size of the file it points to
+    real_rootfs_path=$(readlink -f "${NIX_ROOTFS_DIR}/rootfs.ext4")
     
-    log_info "Nix rootfs built successfully in ${NIX_ROOTFS_DIR}/rootfs"
+    log_info "Nix rootfs built successfully in ${real_rootfs_path}, size: $(du -sh "${real_rootfs_path}" | cut -f1)"
+    # change the permissions of the rootfs to this user:user
+    sudo chown $(whoami):$(whoami) "${real_rootfs_path}"
+
+    log_info "Nix rootfs built successfully in ${NIX_ROOTFS_DIR}/result"
 }
 
 ###################
@@ -339,8 +343,13 @@ build_kernel() {
     fi
 
     log_info "Generating debug information"
-    "${GNU_READELF}" -a "${LINUX_SRC_DIR}/vmlinux" >"${LINUX_SRC_DIR}/vmlinux.readelf.txt"
-    "${GNU_OBJDUMP}" -d "${LINUX_SRC_DIR}/vmlinux" >"${LINUX_SRC_DIR}/vmlinux.asm"
+    if [[ ${USE_LLVM} -eq 1 ]]; then
+        "${LLVM_READELF}" -a "${LINUX_SRC_DIR}/vmlinux" >"${LINUX_SRC_DIR}/vmlinux.readelf.txt"
+        "${LLVM_OBJDUMP}" -d "${LINUX_SRC_DIR}/vmlinux" >"${LINUX_SRC_DIR}/vmlinux.asm"
+    else
+        "${GNU_READELF}" -a "${LINUX_SRC_DIR}/vmlinux" >"${LINUX_SRC_DIR}/vmlinux.readelf.txt"
+        "${GNU_OBJDUMP}" -d "${LINUX_SRC_DIR}/vmlinux" >"${LINUX_SRC_DIR}/vmlinux.asm"
+    fi
 
     log_info "Generating compile_commands.json"
     (cd "${LINUX_SRC_DIR}" && python3 scripts/clang-tools/gen_compile_commands.py)
