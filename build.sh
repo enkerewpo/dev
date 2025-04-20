@@ -19,7 +19,7 @@ readonly TARGET_DEFCONFIG="loongson3_wheatfox_defconfig"
 readonly LOG_DIR="build_logs"
 
 # Dynamic configuration (these should not be readonly)
-USE_LLVM=${USE_LLVM:-1}  # Can be overridden by environment variable
+USE_LLVM=${USE_LLVM:-1} # Can be overridden by environment variable
 LLVM_HOME=${LLVM_HOME:-"/home/wheatfox/tryredox/clang+llvm-18.1.8-x86_64-linux-gnu-ubuntu-18.04/bin"}
 NUM_JOBS=$(nproc)
 
@@ -77,23 +77,23 @@ die() {
 
 setup_workspace() {
     mkdir -p "${LOG_DIR}"
-    
+
     # Load chosen kernel version
     if [[ ! -f .chosen ]]; then
         print_available_versions
         die ".chosen file not found. Please set the kernel version suffix in the .chosen file."
     fi
-    
+
     CHOSEN=$(cat .chosen)
     LINUX_SRC_DIR=$(realpath "linux-${CHOSEN}")
     WORKDIR=$(dirname "${LINUX_SRC_DIR}")
     FLAG="${WORKDIR}/.flag"
-    
+
     if [[ ! -d "linux-${CHOSEN}" ]]; then
         print_available_versions
         die "linux-${CHOSEN} directory not found"
     fi
-    
+
     log_info "Using Linux source: linux-${CHOSEN}"
 }
 
@@ -161,7 +161,7 @@ check_nix() {
     if ! command -v nix >/dev/null 2>&1; then
         die "Nix is not installed. Please install Nix package manager first."
     fi
-    
+
     if ! nix --version >/dev/null 2>&1; then
         die "Nix is not properly installed or configured."
     fi
@@ -169,41 +169,62 @@ check_nix() {
 
 setup_nix_rootfs() {
     log_info "Setting up Nix rootfs configuration"
-    
+
     # Check if Nix configuration files exist
     if [[ ! -f "${NIX_CONFIG_DIR}/default.nix" ]]; then
         die "Nix configuration file ${NIX_CONFIG_DIR}/default.nix not found"
     fi
-    
+
     if [[ ! -f "${NIX_CONFIG_DIR}/shell.nix" ]]; then
         die "Nix configuration file ${NIX_CONFIG_DIR}/shell.nix not found"
     fi
-    
+
     log_info "Using Nix configuration from ${NIX_CONFIG_DIR}"
 }
 
 build_nix_rootfs() {
     check_nix
     setup_nix_rootfs
-    
+
     log_info "Building Nix rootfs for ${NIX_SYSTEM}"
-    
+
     # Create output directory
     mkdir -p "${NIX_ROOTFS_DIR}"
-    
+
     # Build the rootfs using Nix with experimental features enabled
-    if ! nix build --impure --extra-experimental-features 'nix-command flakes' ".#" --out-link "${NIX_ROOTFS_DIR}/rootfs.ext4"; then
+    if ! nix build --impure ".#" --out-link "${NIX_ROOTFS_DIR}/rootfs.ext4"; then
         die "Failed to build Nix rootfs"
     fi
-    
-    # print size of the rootfs, since this is a link, we need to get the size of the file it points to
-    real_rootfs_path=$(readlink -f "${NIX_ROOTFS_DIR}/rootfs.ext4")
-    
-    log_info "Nix rootfs built successfully in ${real_rootfs_path}, size: $(du -sh "${real_rootfs_path}" | cut -f1)"
-    # change the permissions of the rootfs to this user:user
-    sudo chown $(whoami):$(whoami) "${real_rootfs_path}"
 
-    log_info "Nix rootfs built successfully in ${NIX_ROOTFS_DIR}/result"
+    if ! nix build --impure ".#rootfs" --out-link "${NIX_ROOTFS_DIR}/rootfs.ext4.link"; then
+        die "Failed to build Nix rootfs"
+    fi
+
+    if [[ ! -d "${NIX_ROOTFS_DIR}/mount" ]]; then
+        mkdir -p "${NIX_ROOTFS_DIR}/mount"
+    fi
+
+    # if already mounted, unmount it
+    if mount | grep -q "${NIX_ROOTFS_DIR}/mount"; then
+        sudo umount "${NIX_ROOTFS_DIR}/mount"
+    fi
+
+    # resize the rootfs.ext4 to 1G using sudo resize2fs
+    # sudo e2fsck -f "${NIX_ROOTFS_DIR}/rootfs.ext4"
+    sudo resize2fs "${NIX_ROOTFS_DIR}/rootfs.ext4" 1G
+
+    # mount the rootfs.ext4 to the mount directory
+    sudo mount "${NIX_ROOTFS_DIR}/rootfs.ext4" "${NIX_ROOTFS_DIR}/mount"
+
+
+    # copy the contents of the rootfs.ext4.link to the mount directory
+    sudo cp -r "${NIX_ROOTFS_DIR}/rootfs.ext4.link"/* "${NIX_ROOTFS_DIR}/mount"
+    
+    ls -la "${NIX_ROOTFS_DIR}/mount"
+
+    sudo umount "${NIX_ROOTFS_DIR}/mount"
+
+    log_info "Nix rootfs built successfully in ${NIX_ROOTFS_DIR}/mount"
 }
 
 ###################
@@ -214,7 +235,7 @@ build_nix_rootfs() {
 find_tool() {
     local tool=$1
     local llvm_path="${LLVM_HOME}/${tool}"
-    
+
     if [[ ${USE_LLVM} -eq 1 ]]; then
         if [[ -x "${llvm_path}" ]]; then
             echo "${llvm_path}"
@@ -250,13 +271,13 @@ setup_toolchain() {
         LLD=$(find_tool "ld.lld")
         LLVM_OBJCOPY=$(find_tool "llvm-objcopy")
         LLVM_READELF=$(find_tool "llvm-readelf")
-        
+
         # Verify all LLVM tools are found
         [[ -n "${CLANG}" ]] || die "clang not found"
         [[ -n "${LLD}" ]] || die "ld.lld not found"
         [[ -n "${LLVM_OBJCOPY}" ]] || die "llvm-objcopy not found"
         [[ -n "${LLVM_READELF}" ]] || die "llvm-readelf not found"
-        
+
         log_info "LLVM toolchain configuration:"
         log_info "  CLANG: ${CLANG}"
         log_info "  LLD: ${LLD}"
@@ -269,7 +290,7 @@ setup_toolchain() {
         GNU_OBJCOPY=$(get_gnu_tool "objcopy")
         GNU_READELF=$(get_gnu_tool "readelf")
         GNU_OBJDUMP=$(get_gnu_tool "objdump")
-        
+
         log_info "GNU toolchain configuration:"
         log_info "  GCC: ${GNU_GCC}"
         log_info "  OBJCOPY: ${GNU_OBJCOPY}"
@@ -281,7 +302,7 @@ setup_toolchain() {
 # Get make arguments based on toolchain
 get_make_args() {
     local args="-C ${LINUX_SRC_DIR} ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE}"
-    
+
     if [[ ${USE_LLVM} -eq 1 ]]; then
         args+=" LLVM=1"
         args+=" CC=${CLANG}"
@@ -289,7 +310,7 @@ get_make_args() {
         args+=" OBJCOPY=${LLVM_OBJCOPY}"
         args+=" READELF=${LLVM_READELF}"
     fi
-    
+
     echo "${args}"
 }
 
@@ -374,11 +395,11 @@ show_help() {
     {
         echo -e "${BOLD}${WHITE}Linux Kernel Build Script${RESET}"
         echo -e "${BOLD}wheatfox (wheatfox17@.icloud.com) ${RESET}\n"
-        
+
         echo -e "${BOLD}${YELLOW}Usage:${RESET}"
         echo "    ./build [command]"
         echo
-        
+
         echo -e "${BOLD}${YELLOW}Commands:${RESET}"
         echo -e "    ${BOLD}${GREEN}help${RESET}        Show this help message"
         echo -e "    ${BOLD}${GREEN}def${RESET}         Run defconfig and initialize build"
@@ -390,30 +411,30 @@ show_help() {
         echo -e "    ${BOLD}${GREEN}status${RESET}      Show build status and configuration"
         echo -e "    ${BOLD}${GREEN}check${RESET}       Check build dependencies"
         echo
-        
+
         echo -e "${BOLD}${YELLOW}Build Options:${RESET}"
         echo -e "    ${BOLD}${CYAN}USE_LLVM=${RESET}0|1     Enable/disable LLVM toolchain (default: 1)"
         echo -e "    ${BOLD}${CYAN}LLVM_HOME=${RESET}<path>  Set custom LLVM tools path"
         echo
-        
+
         echo -e "${BOLD}${YELLOW}Examples:${RESET}"
         echo "    ./build def                    # Configure kernel"
         echo "    ./build kernel                 # Build kernel with LLVM"
         echo "    USE_LLVM=0 ./build kernel     # Build kernel with GNU toolchain"
         echo "    LLVM_HOME=/opt/llvm ./build   # Use custom LLVM path"
         echo
-        
+
         echo -e "${BOLD}${YELLOW}Toolchain:${RESET}"
         echo "    LLVM: Uses clang ${LLVM_VERSION:-18+} for kernel compilation"
         echo "    GNU:  Uses ${GNU_PREFIX} toolchain"
         echo
-        
+
         echo -e "${BOLD}${YELLOW}Configuration:${RESET}"
         echo "    Architecture:  ${ARCH}"
         echo "    Target:        ${TARGET_DEFCONFIG}"
         echo "    Jobs:          ${NUM_JOBS}"
         echo
-        
+
         echo -e "${BOLD}${YELLOW}More Information:${RESET}"
         echo "    Repository:  https://github.com/enkerewpo/nix-loongarch64"
         echo "    License:     GPL-2.0-or-later"
@@ -448,19 +469,19 @@ main() {
     setup_toolchain
 
     case "${1:-help}" in
-        help|-h|--help) show_help ;;
-        def) run_defconfig ;;
-        clean) clean_build ;;
-        menuconfig) run_menuconfig ;;
-        save) save_defconfig ;;
-        kernel) build_kernel ;;
-        rootfs) build_rootfs ;;
-        status) show_status ;;
-        check) check_build_env ;;
-        *) 
-            log_error "Unknown command: ${1}"
-            show_help
-            ;;
+    help | -h | --help) show_help ;;
+    def) run_defconfig ;;
+    clean) clean_build ;;
+    menuconfig) run_menuconfig ;;
+    save) save_defconfig ;;
+    kernel) build_kernel ;;
+    rootfs) build_rootfs ;;
+    status) show_status ;;
+    check) check_build_env ;;
+    *)
+        log_error "Unknown command: ${1}"
+        show_help
+        ;;
     esac
 }
 

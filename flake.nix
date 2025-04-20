@@ -44,8 +44,6 @@
       echo "root::0:0:root:/root:/bin/bash" > ./etc/passwd
       echo "root:x:0:" > ./etc/group
 
-      # Create init symlink
-      ln -sf /nix/store/*-busybox-*/bin/busybox ./init
     '';
 
     # Create ext4 image
