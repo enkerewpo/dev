@@ -1,0 +1,348 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Copyright (c) 2024-2025 wheatfox <wheatfox17@icloud.com>
+#
+# Linux Kernel Development Build Script
+# This script manages the build process for Linux kernel with Rust support,
+# specifically targeting the Loongarch64 architecture.
+
+set -euo pipefail
+
+###################
+# Configuration
+###################
+
+# Architecture settings
+readonly ARCH="loongarch"
+readonly CROSS_COMPILE="loongarch64-unknown-linux-gnu-"
+readonly TARGET_DEFCONFIG="loongson3_wheatfox_defconfig"
+
+# LLVM settings
+readonly LLVM=1
+readonly LLVM_HOME="/home/wheatfox/tryredox/clang+llvm-18.1.8-x86_64-linux-gnu-ubuntu-18.04/bin"
+readonly CLANG="${LLVM_HOME}/clang"
+readonly LLD="${LLVM_HOME}/ld.lld"
+readonly LLVM_OBJCOPY="${LLVM_HOME}/llvm-objcopy"
+readonly LLVM_READELF="${LLVM_HOME}/llvm-readelf"
+
+# GNU tools
+readonly GNU_PREFIX="loongarch64-unknown-linux-gnu-"
+readonly GNU_GCC="${GNU_PREFIX}gcc"
+readonly GNU_OBJCOPY="${GNU_PREFIX}objcopy"
+readonly GNU_READELF="${GNU_PREFIX}readelf"
+readonly GNU_OBJDUMP="${GNU_PREFIX}objdump"
+
+# Rust configuration
+readonly RUST_VERSION="1.75.0"
+readonly RUST_FLAGS="-Copt-level=2"
+
+# Nix configuration
+readonly NIX_ROOTFS_DIR="nix-rootfs"
+readonly NIX_CONFIG_DIR="nix-config"
+readonly NIX_SYSTEM="loongarch64-linux"
+readonly NIX_PKGS="nixpkgs#pkgsCross.loongarch64-linux"
+
+# Build settings
+readonly NUM_JOBS=$(nproc)
+readonly LOG_DIR="build_logs"
+
+###################
+# Logging Functions
+###################
+
+log_info() {
+    echo -e "\033[0;32m[INFO]\033[0m $1"
+}
+
+log_warn() {
+    echo -e "\033[0;33m[WARN]\033[0m $1" >&2
+}
+
+log_error() {
+    echo -e "\033[0;31m[ERROR]\033[0m $1" >&2
+}
+
+die() {
+    log_error "$1"
+    exit 1
+}
+
+###################
+# Utility Functions
+###################
+
+setup_workspace() {
+    mkdir -p "${LOG_DIR}"
+
+    # Load chosen kernel version
+    if [[ ! -f chosen ]]; then
+        print_available_versions
+        die "chosen file not found. Please set the kernel version suffix in the chosen file."
+    fi
+
+    CHOSEN=$(cat chosen)
+    readonly LINUX_SRC_DIR=$(realpath "linux-${CHOSEN}")
+    readonly WORKDIR=$(dirname "${LINUX_SRC_DIR}")
+    readonly FLAG="${WORKDIR}/.flag"
+
+    if [[ ! -d "linux-${CHOSEN}" ]]; then
+        print_available_versions
+        die "linux-${CHOSEN} directory not found"
+    fi
+
+    log_info "Using Linux source: linux-${CHOSEN}"
+}
+
+print_available_versions() {
+    log_info "Available versions to set in the ./chosen file:"
+    local cnt=0
+    while IFS= read -r dir; do
+        if [[ -d "${dir}" ]]; then
+            ((cnt++))
+            echo "${cnt}) ${dir#linux-}"
+        fi
+    done < <(ls -d linux-* 2>/dev/null || true)
+}
+
+check_dependencies() {
+    local missing_deps=()
+
+    # Check LLVM tools
+    [[ ! -x "${CLANG}" ]] && missing_deps+=("clang")
+    [[ ! -x "${LLD}" ]] && missing_deps+=("lld")
+    [[ ! -x "${LLVM_OBJCOPY}" ]] && missing_deps+=("llvm-objcopy")
+    [[ ! -x "${LLVM_READELF}" ]] && missing_deps+=("llvm-readelf")
+
+    # Check GNU tools
+    command -v "${GNU_GCC}" >/dev/null 2>&1 || missing_deps+=("${GNU_GCC}")
+    command -v "${GNU_OBJCOPY}" >/dev/null 2>&1 || missing_deps+=("${GNU_OBJCOPY}")
+    command -v "${GNU_READELF}" >/dev/null 2>&1 || missing_deps+=("${GNU_READELF}")
+    command -v "${GNU_OBJDUMP}" >/dev/null 2>&1 || missing_deps+=("${GNU_OBJDUMP}")
+
+    if ((${#missing_deps[@]} > 0)); then
+        log_error "Missing required dependencies:"
+        printf '%s\n' "${missing_deps[@]}" >&2
+        exit 1
+    fi
+}
+
+check_rust() {
+    if ! command -v rustc >/dev/null 2>&1; then
+        die "Rust is not installed. Please install Rust using rustup."
+    fi
+
+    if ! command -v cargo >/dev/null 2>&1; then
+        die "Cargo is not installed. Please install Rust using rustup."
+    fi
+
+    local installed_version
+    installed_version=$(rustc --version | cut -d ' ' -f 2)
+    if [[ "$(printf '%s\n' "${RUST_VERSION}" "${installed_version}" | sort -V | head -n1)" != "${RUST_VERSION}" ]]; then
+        die "Rust version ${RUST_VERSION} or higher is required (found ${installed_version})"
+    fi
+}
+
+init_submodules() {
+    log_info "Initializing submodules"
+    git submodule update --init --recursive
+
+    log_info "Submodules:"
+    git submodule status
+}
+
+check_nix() {
+    if ! command -v nix >/dev/null 2>&1; then
+        die "Nix is not installed. Please install Nix package manager first."
+    fi
+    
+    if ! nix --version >/dev/null 2>&1; then
+        die "Nix is not properly installed or configured."
+    fi
+}
+
+setup_nix_rootfs() {
+    log_info "Setting up Nix rootfs configuration"
+    
+    # Check if Nix configuration files exist
+    if [[ ! -f "${NIX_CONFIG_DIR}/default.nix" ]]; then
+        die "Nix configuration file ${NIX_CONFIG_DIR}/default.nix not found"
+    fi
+    
+    if [[ ! -f "${NIX_CONFIG_DIR}/shell.nix" ]]; then
+        die "Nix configuration file ${NIX_CONFIG_DIR}/shell.nix not found"
+    fi
+    
+    log_info "Using Nix configuration from ${NIX_CONFIG_DIR}"
+}
+
+build_nix_rootfs() {
+    check_nix
+    setup_nix_rootfs
+    
+    log_info "Building Nix rootfs for ${NIX_SYSTEM}"
+    
+    # Create output directory
+    mkdir -p "${NIX_ROOTFS_DIR}"
+    
+    # Build the rootfs using Nix with experimental features enabled
+    if ! nix build --extra-experimental-features 'nix-command flakes' ".#" --out-link "${NIX_ROOTFS_DIR}/result"; then
+        die "Failed to build Nix rootfs"
+    fi
+    
+    # Copy the result to a more accessible location
+    cp -r "${NIX_ROOTFS_DIR}/result"/* "${NIX_ROOTFS_DIR}/rootfs"
+    
+    log_info "Nix rootfs built successfully in ${NIX_ROOTFS_DIR}/rootfs"
+}
+
+###################
+# Build Functions
+###################
+
+get_make_args() {
+    echo -n "-C ${LINUX_SRC_DIR} \
+        ARCH=${ARCH} \
+        CROSS_COMPILE=${CROSS_COMPILE} \
+        LLVM=${LLVM} \
+        CC=${CLANG} \
+        LD=${LLD} \
+        OBJCOPY=${LLVM_OBJCOPY} \
+        READELF=${LLVM_READELF} \
+        RUST=1 \
+        RUST_FLAGS='${RUST_FLAGS}'"
+}
+
+run_defconfig() {
+    log_info "Running defconfig"
+    # shellcheck disable=SC2046
+    make $(get_make_args) "${TARGET_DEFCONFIG}"
+    echo "ROOT" >"${FLAG}"
+}
+
+clean_build() {
+    log_info "Cleaning the build"
+    # shellcheck disable=SC2046
+    make $(get_make_args) clean
+    rm -f "${FLAG}"
+}
+
+run_menuconfig() {
+    log_info "Running menuconfig"
+    # shellcheck disable=SC2046
+    make $(get_make_args) menuconfig
+}
+
+save_defconfig() {
+    log_info "Saving defconfig"
+    cp "${LINUX_SRC_DIR}/.config" "${LINUX_SRC_DIR}/arch/${ARCH}/configs/${TARGET_DEFCONFIG}"
+}
+
+build_kernel() {
+    [[ ! -f "${FLAG}" ]] && die "Please run 'build def' first"
+
+    check_rust
+
+    log_info "Building kernel with:"
+    log_info "  LLVM=${LLVM}"
+    log_info "  Jobs=${NUM_JOBS}"
+    log_info "  Rust support enabled"
+
+    # Enable Rust support in kernel config
+    if ! grep -q "CONFIG_RUST=y" "${LINUX_SRC_DIR}/.config" 2>/dev/null; then
+        log_info "Enabling Rust support in kernel config"
+        echo "CONFIG_RUST=y" >>"${LINUX_SRC_DIR}/.config"
+    fi
+
+    local build_log="${LOG_DIR}/build_$(date +%Y%m%d_%H%M%S).log"
+
+    # shellcheck disable=SC2046
+    if ! make $(get_make_args) -j"${NUM_JOBS}" 2>&1 | tee "${build_log}"; then
+        log_error "Build failed. See ${build_log} for details"
+        exit 1
+    fi
+
+    log_info "Generating debug information"
+    "${GNU_READELF}" -a "${LINUX_SRC_DIR}/vmlinux" >"${LINUX_SRC_DIR}/vmlinux.readelf.txt"
+    "${GNU_OBJDUMP}" -d "${LINUX_SRC_DIR}/vmlinux" >"${LINUX_SRC_DIR}/vmlinux.asm"
+
+    log_info "Generating compile_commands.json"
+    (cd "${LINUX_SRC_DIR}" && python3 scripts/clang-tools/gen_compile_commands.py)
+
+    log_info "Build completed successfully"
+}
+
+build_rootfs() {
+    log_info "Building rootfs"
+    build_nix_rootfs
+}
+
+show_help() {
+    cat <<EOF
+Linux Kernel Build Script
+
+Usage: ./build [command]
+
+Commands:
+    help        Show this help message
+    def         Run defconfig and initialize build
+    clean       Clean the build artifacts
+    menuconfig  Run kernel menuconfig
+    save        Save current config as defconfig
+    kernel      Build the kernel (requires def first)
+    rootfs      Build the root filesystem using Nix
+    status      Show build status and configuration
+    check       Check build dependencies
+
+Examples:
+    ./build def         # Configure kernel
+    ./build kernel      # Build kernel with Rust support
+    ./build rootfs      # Build rootfs using Nix
+    ./build clean      # Clean build artifacts
+
+For more information, visit: https://github.com/wheatfox/linux-dev
+EOF
+    exit 0
+}
+
+show_status() {
+    log_info "Build Status:"
+    echo "  Kernel Version: linux-${CHOSEN}"
+    echo "  Architecture: ${ARCH}"
+    echo "  Compiler: ${LLVM:+LLVM }Clang"
+    echo "  Rust Support: Enabled (${RUST_VERSION}+)"
+    echo "  Build Config: ${TARGET_DEFCONFIG}"
+    echo "  Build Ready: $([[ -f "${FLAG}" ]] && echo "Yes" || echo "No (run 'build def' first)")"
+}
+
+check_build_env() {
+    log_info "Checking build environment"
+    check_dependencies
+    check_rust
+    log_info "All dependencies satisfied"
+}
+
+###################
+# Main
+###################
+
+main() {
+    setup_workspace
+
+    case "${1:-help}" in
+        help|-h|--help) show_help ;;
+        def) run_defconfig ;;
+        clean) clean_build ;;
+        menuconfig) run_menuconfig ;;
+        save) save_defconfig ;;
+        kernel) build_kernel ;;
+        rootfs) build_rootfs ;;
+        status) show_status ;;
+        check) check_build_env ;;
+        *) 
+            log_error "Unknown command: ${1}"
+            show_help
+            ;;
+    esac
+}
+
+main "$@"
