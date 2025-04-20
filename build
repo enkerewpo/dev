@@ -59,11 +59,11 @@ log_info() {
 }
 
 log_warn() {
-    echo -e "\033[0;33m[WARN]\033[0m $1 >&2
+    echo -e "\033[0;33m[WARN]\033[0m $1" >&2
 }
 
 log_error() {
-    echo -e "\033[0;31m[ERROR]\033[0m $1 >&2
+    echo -e "\033[0;31m[ERROR]\033[0m $1" >&2
 }
 
 die() {
@@ -79,12 +79,12 @@ setup_workspace() {
     mkdir -p "${LOG_DIR}"
     
     # Load chosen kernel version
-    if [[ ! -f chosen ]]; then
+    if [[ ! -f .chosen ]]; then
         print_available_versions
-        die "chosen file not found. Please set the kernel version suffix in the chosen file."
+        die ".chosen file not found. Please set the kernel version suffix in the .chosen file."
     fi
     
-    CHOSEN=$(cat chosen)
+    CHOSEN=$(cat .chosen)
     LINUX_SRC_DIR=$(realpath "linux-${CHOSEN}")
     WORKDIR=$(dirname "${LINUX_SRC_DIR}")
     FLAG="${WORKDIR}/.flag"
@@ -98,14 +98,17 @@ setup_workspace() {
 }
 
 print_available_versions() {
-    log_info "Available versions to set in the ./chosen file:"
-    local cnt=0
-    while IFS= read -r dir; do
+    log_info "Available versions to set in the .chosen file:"
+    local found=0
+    for dir in linux-*; do
         if [[ -d "${dir}" ]]; then
-            ((cnt++))
-            echo "${cnt}) ${dir#linux-}"
+            log_info "${dir#linux-}"
+            found=1
         fi
-    done < <(ls -d linux-* 2>/dev/null || true)
+    done
+    if [[ $found -eq 0 ]]; then
+        log_error "No Linux kernel directories found. Please clone a Linux kernel repository first."
+    fi
 }
 
 check_dependencies() {
