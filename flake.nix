@@ -9,16 +9,8 @@
     system = "x86_64-linux";
     pkgs = nixpkgs.legacyPackages.${system};
     
-    # Loongarch64 cross-compilation configuration
-    loongarch64Pkgs = import nixpkgs {
-      inherit system;
-      crossSystem = {
-        config = "loongarch64-unknown-linux-gnu";
-        libc = "glibc";
-        withTLS = true;
-        withLLVM = true;
-      };
-    };
+    # Use the built-in Loongarch64 cross-compilation support
+    loongarch64Pkgs = pkgs.pkgsCross.loongarch64-linux;
   in {
     packages.${system}.default = import ./nix-config/default.nix { pkgs = loongarch64Pkgs; };
     devShells.${system}.default = import ./nix-config/shell.nix { pkgs = pkgs; };
