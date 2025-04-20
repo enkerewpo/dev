@@ -185,7 +185,7 @@ build_nix_rootfs() {
     mkdir -p "${NIX_ROOTFS_DIR}"
     
     # Build the rootfs using Nix with experimental features enabled
-    if ! nix build --extra-experimental-features 'nix-command flakes' ".#" --out-link "${NIX_ROOTFS_DIR}/result"; then
+    if ! nix build --impure --extra-experimental-features 'nix-command flakes' ".#" --out-link "${NIX_ROOTFS_DIR}/result"; then
         die "Failed to build Nix rootfs"
     fi
     

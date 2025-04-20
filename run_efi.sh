@@ -10,7 +10,7 @@ KERNEL_PATH=linux-${CHOSEN}/arch/loongarch/boot/vmlinux.efi
 
 qemu-system-loongarch64 -m 16G -cpu la464 \
     -machine virt \
-    -smp 1 -bios QEMU_EFI.fd -kernel $KERNEL_PATH \
+    -smp 1 -bios firmware/QEMU_EFI.fd -kernel $KERNEL_PATH \
     -append "root=/dev/ram rdinit=/init console=ttyS0,115200" \
     -serial mon:stdio \
     -device igb,netdev=net0,bus=pcie.0,addr=0x6 \

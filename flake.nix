@@ -5,8 +5,22 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
   };
 
-  outputs = { self, nixpkgs }: {
-    packages.x86_64-linux.default = import ./nix-config/default.nix { pkgs = nixpkgs.legacyPackages.x86_64-linux; };
-    devShells.x86_64-linux.default = import ./nix-config/shell.nix { pkgs = nixpkgs.legacyPackages.x86_64-linux; };
+  outputs = { self, nixpkgs }: let
+    system = "x86_64-linux";
+    pkgs = nixpkgs.legacyPackages.${system};
+    
+    # Loongarch64 cross-compilation configuration
+    loongarch64Pkgs = import nixpkgs {
+      inherit system;
+      crossSystem = {
+        config = "loongarch64-unknown-linux-gnu";
+        libc = "glibc";
+        withTLS = true;
+        withLLVM = true;
+      };
+    };
+  in {
+    packages.${system}.default = import ./nix-config/default.nix { pkgs = loongarch64Pkgs; };
+    devShells.${system}.default = import ./nix-config/shell.nix { pkgs = pkgs; };
   };
 } 

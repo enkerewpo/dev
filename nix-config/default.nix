@@ -1,18 +1,8 @@
-{ pkgs ? import <nixpkgs> {} }:
+{ pkgs }:
 
-let
-  crossPkgs = import <nixpkgs> {
-    crossSystem = {
-      config = "loongarch64-unknown-linux-gnu";
-      libc = "glibc";
-      withTLS = true;
-      withLLVM = true;
-    };
-  };
-in
-crossPkgs.buildEnv {
+pkgs.buildEnv {
   name = "loongarch64-rootfs";
-  paths = with crossPkgs; [
+  paths = with pkgs; [
     bash
     coreutils
     util-linux
