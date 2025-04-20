@@ -34,6 +34,7 @@ CLANG=""
 LLD=""
 LLVM_OBJCOPY=""
 LLVM_READELF=""
+LLVM_OBJDUMP=""
 GNU_PREFIX="loongarch64-unknown-linux-gnu-"
 GNU_GCC=""
 GNU_OBJCOPY=""
@@ -271,18 +272,21 @@ setup_toolchain() {
         LLD=$(find_tool "ld.lld")
         LLVM_OBJCOPY=$(find_tool "llvm-objcopy")
         LLVM_READELF=$(find_tool "llvm-readelf")
+        LLVM_OBJDUMP=$(find_tool "llvm-objdump")
 
         # Verify all LLVM tools are found
         [[ -n "${CLANG}" ]] || die "clang not found"
         [[ -n "${LLD}" ]] || die "ld.lld not found"
         [[ -n "${LLVM_OBJCOPY}" ]] || die "llvm-objcopy not found"
         [[ -n "${LLVM_READELF}" ]] || die "llvm-readelf not found"
+        [[ -n "${LLVM_OBJDUMP}" ]] || die "llvm-objdump not found"
 
         log_info "LLVM toolchain configuration:"
         log_info "  CLANG: ${CLANG}"
         log_info "  LLD: ${LLD}"
         log_info "  OBJCOPY: ${LLVM_OBJCOPY}"
         log_info "  READELF: ${LLVM_READELF}"
+        log_info "  OBJDUMP: ${LLVM_OBJDUMP}"
     else
         log_info "Using GNU toolchain"
         # Set up GNU tools for non-LLVM builds
@@ -345,7 +349,7 @@ build_kernel() {
     check_rust
 
     log_info "Building kernel with:"
-    log_info "  LLVM=${LLVM}"
+    log_info "  USE_LLVM=${USE_LLVM}"
     log_info "  Jobs=${NUM_JOBS}"
     log_info "  Rust support enabled"
 
