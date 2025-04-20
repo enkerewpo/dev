@@ -12,39 +12,43 @@ set -euo pipefail
 # Configuration
 ###################
 
-# Architecture settings
+# Build configuration (these can be readonly)
 readonly ARCH="loongarch"
 readonly CROSS_COMPILE="loongarch64-unknown-linux-gnu-"
 readonly TARGET_DEFCONFIG="loongson3_wheatfox_defconfig"
+readonly LOG_DIR="build_logs"
 
-# LLVM settings
-readonly LLVM=1
-readonly LLVM_HOME="/home/wheatfox/tryredox/clang+llvm-18.1.8-x86_64-linux-gnu-ubuntu-18.04/bin"
-readonly CLANG="${LLVM_HOME}/clang"
-readonly LLD="${LLVM_HOME}/ld.lld"
-readonly LLVM_OBJCOPY="${LLVM_HOME}/llvm-objcopy"
-readonly LLVM_READELF="${LLVM_HOME}/llvm-readelf"
+# Dynamic configuration (these should not be readonly)
+USE_LLVM=${USE_LLVM:-1}  # Can be overridden by environment variable
+LLVM_HOME=${LLVM_HOME:-"/home/wheatfox/tryredox/clang+llvm-18.1.8-x86_64-linux-gnu-ubuntu-18.04/bin"}
+NUM_JOBS=$(nproc)
 
-# GNU tools
-readonly GNU_PREFIX="loongarch64-unknown-linux-gnu-"
-readonly GNU_GCC="${GNU_PREFIX}gcc"
-readonly GNU_OBJCOPY="${GNU_PREFIX}objcopy"
-readonly GNU_READELF="${GNU_PREFIX}readelf"
-readonly GNU_OBJDUMP="${GNU_PREFIX}objdump"
+# Variables for workspace paths (will be set in setup_workspace)
+CHOSEN=""
+LINUX_SRC_DIR=""
+WORKDIR=""
+FLAG=""
+
+# Variables for tools (will be set in setup_toolchain)
+CLANG=""
+LLD=""
+LLVM_OBJCOPY=""
+LLVM_READELF=""
+GNU_PREFIX="loongarch64-unknown-linux-gnu-"
+GNU_GCC=""
+GNU_OBJCOPY=""
+GNU_READELF=""
+GNU_OBJDUMP=""
 
 # Rust configuration
-readonly RUST_VERSION="1.75.0"
-readonly RUST_FLAGS="-Copt-level=2"
+RUST_VERSION="1.75.0"
+RUST_FLAGS="-Copt-level=2"
 
 # Nix configuration
-readonly NIX_ROOTFS_DIR="nix-rootfs"
-readonly NIX_CONFIG_DIR="nix-config"
-readonly NIX_SYSTEM="loongarch64-linux"
-readonly NIX_PKGS="nixpkgs#pkgsCross.loongarch64-linux"
-
-# Build settings
-readonly NUM_JOBS=$(nproc)
-readonly LOG_DIR="build_logs"
+NIX_ROOTFS_DIR="nix-rootfs"
+NIX_CONFIG_DIR="nix-config"
+NIX_SYSTEM="loongarch64-linux"
+NIX_PKGS="nixpkgs#pkgsCross.loongarch64-linux"
 
 ###################
 # Logging Functions
@@ -55,11 +59,11 @@ log_info() {
 }
 
 log_warn() {
-    echo -e "\033[0;33m[WARN]\033[0m $1" >&2
+    echo -e "\033[0;33m[WARN]\033[0m $1 >&2
 }
 
 log_error() {
-    echo -e "\033[0;31m[ERROR]\033[0m $1" >&2
+    echo -e "\033[0;31m[ERROR]\033[0m $1 >&2
 }
 
 die() {
@@ -73,23 +77,23 @@ die() {
 
 setup_workspace() {
     mkdir -p "${LOG_DIR}"
-
+    
     # Load chosen kernel version
     if [[ ! -f chosen ]]; then
         print_available_versions
         die "chosen file not found. Please set the kernel version suffix in the chosen file."
     fi
-
+    
     CHOSEN=$(cat chosen)
-    readonly LINUX_SRC_DIR=$(realpath "linux-${CHOSEN}")
-    readonly WORKDIR=$(dirname "${LINUX_SRC_DIR}")
-    readonly FLAG="${WORKDIR}/.flag"
-
+    LINUX_SRC_DIR=$(realpath "linux-${CHOSEN}")
+    WORKDIR=$(dirname "${LINUX_SRC_DIR}")
+    FLAG="${WORKDIR}/.flag"
+    
     if [[ ! -d "linux-${CHOSEN}" ]]; then
         print_available_versions
         die "linux-${CHOSEN} directory not found"
     fi
-
+    
     log_info "Using Linux source: linux-${CHOSEN}"
 }
 
@@ -199,17 +203,87 @@ build_nix_rootfs() {
 # Build Functions
 ###################
 
+# Function to find tool in LLVM_HOME or PATH
+find_tool() {
+    local tool=$1
+    local llvm_path="${LLVM_HOME}/${tool}"
+    
+    if [[ ${USE_LLVM} -eq 1 ]]; then
+        if [[ -x "${llvm_path}" ]]; then
+            echo "${llvm_path}"
+        else
+            # Try to find in PATH with llvm- or clang- prefix
+            local path_tool
+            for prefix in "" "llvm-" "clang-"; do
+                path_tool=$(command -v "${prefix}${tool}")
+                if [[ -n "${path_tool}" ]]; then
+                    echo "${path_tool}"
+                    return 0
+                fi
+            done
+            die "Cannot find ${tool} in ${LLVM_HOME} or PATH"
+        fi
+    else
+        echo ""
+    fi
+}
+
+# Function to get GNU tool path
+get_gnu_tool() {
+    local tool=$1
+    local gnu_tool="${CROSS_COMPILE}${tool}"
+    command -v "${gnu_tool}" || die "Cannot find ${gnu_tool} in PATH"
+}
+
+# Set up toolchain
+setup_toolchain() {
+    if [[ ${USE_LLVM} -eq 1 ]]; then
+        log_info "Using LLVM toolchain"
+        CLANG=$(find_tool "clang")
+        LLD=$(find_tool "ld.lld")
+        LLVM_OBJCOPY=$(find_tool "llvm-objcopy")
+        LLVM_READELF=$(find_tool "llvm-readelf")
+        
+        # Verify all LLVM tools are found
+        [[ -n "${CLANG}" ]] || die "clang not found"
+        [[ -n "${LLD}" ]] || die "ld.lld not found"
+        [[ -n "${LLVM_OBJCOPY}" ]] || die "llvm-objcopy not found"
+        [[ -n "${LLVM_READELF}" ]] || die "llvm-readelf not found"
+        
+        log_info "LLVM toolchain configuration:"
+        log_info "  CLANG: ${CLANG}"
+        log_info "  LLD: ${LLD}"
+        log_info "  OBJCOPY: ${LLVM_OBJCOPY}"
+        log_info "  READELF: ${LLVM_READELF}"
+    else
+        log_info "Using GNU toolchain"
+        # Set up GNU tools for non-LLVM builds
+        GNU_GCC=$(get_gnu_tool "gcc")
+        GNU_OBJCOPY=$(get_gnu_tool "objcopy")
+        GNU_READELF=$(get_gnu_tool "readelf")
+        GNU_OBJDUMP=$(get_gnu_tool "objdump")
+        
+        log_info "GNU toolchain configuration:"
+        log_info "  GCC: ${GNU_GCC}"
+        log_info "  OBJCOPY: ${GNU_OBJCOPY}"
+        log_info "  READELF: ${GNU_READELF}"
+        log_info "  OBJDUMP: ${GNU_OBJDUMP}"
+    fi
+}
+
+# Get make arguments based on toolchain
 get_make_args() {
-    echo -n "-C ${LINUX_SRC_DIR} \
-        ARCH=${ARCH} \
-        CROSS_COMPILE=${CROSS_COMPILE} \
-        LLVM=${LLVM} \
-        CC=${CLANG} \
-        LD=${LLD} \
-        OBJCOPY=${LLVM_OBJCOPY} \
-        READELF=${LLVM_READELF} \
-        RUST=1 \
-        RUST_FLAGS='${RUST_FLAGS}'"
+    local args="-C ${LINUX_SRC_DIR} ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE}"
+    
+    if [[ ${USE_LLVM} -eq 1 ]]; then
+        args+=" LLVM=1"
+        args+=" CC=${CLANG}"
+        args+=" LD=${LLD}"
+        args+=" OBJCOPY=${LLVM_OBJCOPY}"
+        args+=" READELF=${LLVM_READELF}"
+    fi
+    
+    echo "${args}"
 }
 
 run_defconfig() {
@@ -277,31 +351,61 @@ build_rootfs() {
 }
 
 show_help() {
-    cat <<EOF
-Linux Kernel Build Script
+    # Color codes
+    local RESET="\033[0m"
+    local BOLD="\033[1m"
+    local WHITE="\033[37m"
+    local YELLOW="\033[33m"
+    local GREEN="\033[32m"
+    local CYAN="\033[36m"
 
-Usage: ./build [command]
-
-Commands:
-    help        Show this help message
-    def         Run defconfig and initialize build
-    clean       Clean the build artifacts
-    menuconfig  Run kernel menuconfig
-    save        Save current config as defconfig
-    kernel      Build the kernel (requires def first)
-    rootfs      Build the root filesystem using Nix
-    status      Show build status and configuration
-    check       Check build dependencies
-
-Examples:
-    ./build def         # Configure kernel
-    ./build kernel      # Build kernel with Rust support
-    ./build rootfs      # Build rootfs using Nix
-    ./build clean      # Clean build artifacts
-
-For more information, visit: https://github.com/wheatfox/linux-dev
-EOF
-    exit 0
+    {
+        echo -e "${BOLD}${WHITE}Linux Kernel Build Script${RESET}"
+        echo -e "${BOLD}wheatfox (wheatfox17@.icloud.com) ${RESET}\n"
+        
+        echo -e "${BOLD}${YELLOW}Usage:${RESET}"
+        echo "    ./build [command]"
+        echo
+        
+        echo -e "${BOLD}${YELLOW}Commands:${RESET}"
+        echo -e "    ${BOLD}${GREEN}help${RESET}        Show this help message"
+        echo -e "    ${BOLD}${GREEN}def${RESET}         Run defconfig and initialize build"
+        echo -e "    ${BOLD}${GREEN}clean${RESET}       Clean the build artifacts"
+        echo -e "    ${BOLD}${GREEN}menuconfig${RESET}  Run kernel menuconfig"
+        echo -e "    ${BOLD}${GREEN}save${RESET}        Save current config as defconfig"
+        echo -e "    ${BOLD}${GREEN}kernel${RESET}      Build the kernel (requires def first)"
+        echo -e "    ${BOLD}${GREEN}rootfs${RESET}      Build the root filesystem using Nix"
+        echo -e "    ${BOLD}${GREEN}status${RESET}      Show build status and configuration"
+        echo -e "    ${BOLD}${GREEN}check${RESET}       Check build dependencies"
+        echo
+        
+        echo -e "${BOLD}${YELLOW}Build Options:${RESET}"
+        echo -e "    ${BOLD}${CYAN}USE_LLVM=${RESET}0|1     Enable/disable LLVM toolchain (default: 1)"
+        echo -e "    ${BOLD}${CYAN}LLVM_HOME=${RESET}<path>  Set custom LLVM tools path"
+        echo
+        
+        echo -e "${BOLD}${YELLOW}Examples:${RESET}"
+        echo "    ./build def                    # Configure kernel"
+        echo "    ./build kernel                 # Build kernel with LLVM"
+        echo "    USE_LLVM=0 ./build kernel     # Build kernel with GNU toolchain"
+        echo "    LLVM_HOME=/opt/llvm ./build   # Use custom LLVM path"
+        echo
+        
+        echo -e "${BOLD}${YELLOW}Toolchain:${RESET}"
+        echo "    LLVM: Uses clang ${LLVM_VERSION:-18+} for kernel compilation"
+        echo "    GNU:  Uses ${GNU_PREFIX} toolchain"
+        echo
+        
+        echo -e "${BOLD}${YELLOW}Configuration:${RESET}"
+        echo "    Architecture:  ${ARCH}"
+        echo "    Target:        ${TARGET_DEFCONFIG}"
+        echo "    Jobs:          ${NUM_JOBS}"
+        echo
+        
+        echo -e "${BOLD}${YELLOW}More Information:${RESET}"
+        echo "    Repository:  https://github.com/enkerewpo/nix-loongarch64"
+        echo "    License:     GPL-2.0-or-later"
+    } | less -R
 }
 
 show_status() {
@@ -327,6 +431,9 @@ check_build_env() {
 
 main() {
     setup_workspace
+
+    # Call setup_toolchain early in the script
+    setup_toolchain
 
     case "${1:-help}" in
         help|-h|--help) show_help ;;
