@@ -26,6 +26,8 @@ pkgs.buildEnv {
     openssl
     pciutils
     vim
+    perf-tools
+    libbpf
   ];
   
   extraOutputsToInstall = [ "dev" "bin" "out" ];
