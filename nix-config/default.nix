@@ -15,6 +15,8 @@ pkgs.buildEnv {
     gnutar
     gzip
     gcc
+    btop
+    neofetch
     binutils
     gnumake
     iproute2
@@ -22,9 +24,8 @@ pkgs.buildEnv {
     glibc
     zlib
     openssl
-    neofetch
-    # systemd
-    # rt-tests
+    pciutils
+    vim
   ];
   
   extraOutputsToInstall = [ "dev" "bin" "out" ];
@@ -38,6 +39,21 @@ pkgs.buildEnv {
     mkdir -p $out/etc
     echo "root::0:0:root:/root:/bin/bash" > $out/etc/passwd
     echo "root:x:0:" > $out/etc/group
+    
+    # Add NixOS os-release information
+    cat <<EOF > $out/etc/os-release
+NAME=NixOS
+ID=nixos
+VERSION="wheatfox-20250421"
+VERSION_CODENAME=wheatfox
+PRETTY_NAME="NixOS wheatfox-20250421"
+LOGO="nix-snowflake"
+HOME_URL="https://nixos.org/"
+DOCUMENTATION_URL="https://nixos.org/learn.html"
+SUPPORT_URL="https://nixos.org/community.html"
+BUG_REPORT_URL="https://github.com/NixOS/nixpkgs/issues"
+EOF
+    
     # run mount sys /sys -t sysfs and mount proc /proc -t proc in rcS
     # we first need to create the rcS script
     mkdir -p $out/etc/init.d
