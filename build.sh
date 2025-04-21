@@ -211,7 +211,7 @@ build_nix_rootfs() {
     fi
 
     # resize the rootfs.ext4 to 1G using sudo resize2fs
-    # sudo e2fsck -f "${NIX_ROOTFS_DIR}/rootfs.ext4"
+    sudo e2fsck -f "${NIX_ROOTFS_DIR}/rootfs.ext4"
     sudo resize2fs "${NIX_ROOTFS_DIR}/rootfs.ext4" 1G
 
     # mount the rootfs.ext4 to the mount directory
@@ -401,7 +401,7 @@ show_help() {
         echo -e "${BOLD}wheatfox (wheatfox17@.icloud.com) ${RESET}\n"
 
         echo -e "${BOLD}${YELLOW}Usage:${RESET}"
-        echo "    ./build [command]"
+        echo "    ./build.sh [command]"
         echo
 
         echo -e "${BOLD}${YELLOW}Commands:${RESET}"
@@ -422,10 +422,10 @@ show_help() {
         echo
 
         echo -e "${BOLD}${YELLOW}Examples:${RESET}"
-        echo "    ./build def                    # Configure kernel"
-        echo "    ./build kernel                 # Build kernel with LLVM"
-        echo "    USE_LLVM=0 ./build kernel     # Build kernel with GNU toolchain"
-        echo "    LLVM_HOME=/opt/llvm ./build   # Use custom LLVM path"
+        echo "    ./build.sh def                    # Configure kernel"
+        echo "    ./build.sh kernel                 # Build kernel with LLVM"
+        echo "    USE_LLVM=0 ./build.sh kernel     # Build kernel with GNU toolchain"
+        echo "    LLVM_HOME=/opt/llvm ./build.sh   # Use custom LLVM path"
         echo
 
         echo -e "${BOLD}${YELLOW}Toolchain:${RESET}"

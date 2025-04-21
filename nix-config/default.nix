@@ -3,43 +3,33 @@
 pkgs.buildEnv {
   name = "loongarch64-rootfs";
   paths = with pkgs; [
-    # Core system utilities
     busybox
     coreutils
     bash
     nix
     curl
-    
-    # Basic system tools
     findutils
     gawk
     gnugrep
     gnused
     gnutar
     gzip
-    
-    # Development tools
     gcc
     binutils
     gnumake
-    
-    # Network tools
     iproute2
     iptables
-    
-    # Essential libraries
     glibc
     zlib
     openssl
+    neofetch
+    # systemd
+    # rt-tests
   ];
   
-  # Add any additional configuration here
   extraOutputsToInstall = [ "dev" "bin" "out" ];
-  
-  # Ensure proper permissions
   pathsToLink = [ "/bin" "/sbin" "/lib" "/share" ];
-  
-  # Set up basic directory structure
+  buildInputs = with pkgs; [ gcc binutils ];
   postBuild = ''
     mkdir -p $out/{dev,proc,sys,run,tmp,var/log,var/tmp}
     chmod 1777 $out/tmp $out/var/tmp
