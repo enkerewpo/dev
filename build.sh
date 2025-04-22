@@ -51,7 +51,6 @@ RUST_FLAGS="-Copt-level=2"
 NIX_ROOTFS_DIR="nix-rootfs"
 NIX_CONFIG_DIR="nix-config"
 NIX_SYSTEM="loongarch64-linux"
-NIX_PKGS="nixpkgs#pkgsCross.loongarch64-linux"
 
 ###################
 # Logging Functions
@@ -173,14 +172,7 @@ check_nix() {
 setup_nix_rootfs() {
     log_info "Setting up Nix rootfs configuration"
 
-    # Check if Nix configuration files exist
-    if [[ ! -f "${NIX_CONFIG_DIR}/default.nix" ]]; then
-        die "Nix configuration file ${NIX_CONFIG_DIR}/default.nix not found"
-    fi
-
-    if [[ ! -f "${NIX_CONFIG_DIR}/shell.nix" ]]; then
-        die "Nix configuration file ${NIX_CONFIG_DIR}/shell.nix not found"
-    fi
+    # do nothing now
 
     log_info "Using Nix configuration from ${NIX_CONFIG_DIR}"
 }
@@ -194,13 +186,15 @@ build_nix_rootfs() {
     # Create output directory
     mkdir -p "${NIX_ROOTFS_DIR}"
 
-    # Build the rootfs using Nix with experimental features enabled
-    if ! nix build --impure ".#" --out-link "${NIX_ROOTFS_DIR}/rootfs.ext4"; then
-        die "Failed to build Nix rootfs"
+    export NIXPKGS_ALLOW_UNSUPPORTED_SYSTEM=1
+
+    # Build the rootfs using Nix
+    if ! nix-build --impure --show-trace --no-sandbox -A image --out-link "${NIX_ROOTFS_DIR}/rootfs.ext4"; then
+        die "Failed to build Nix rootfs image"
     fi
 
-    if ! nix build --impure ".#rootfs" --out-link "${NIX_ROOTFS_DIR}/rootfs.ext4.link"; then
-        die "Failed to build Nix rootfs"
+    if ! nix-build --impure --show-trace --no-sandbox -A rootfs --out-link "${NIX_ROOTFS_DIR}/rootfs.ext4.link"; then
+        die "Failed to build Nix rootfs content"
     fi
 
     if [[ ! -d "${NIX_ROOTFS_DIR}/mount" ]]; then
@@ -219,11 +213,15 @@ build_nix_rootfs() {
     # mount the rootfs.ext4 to the mount directory
     sudo mount "${NIX_ROOTFS_DIR}/rootfs.ext4" "${NIX_ROOTFS_DIR}/mount"
 
-
     # copy the contents of the rootfs.ext4.link to the mount directory
     sudo cp -r "${NIX_ROOTFS_DIR}/rootfs.ext4.link"/* "${NIX_ROOTFS_DIR}/mount"
     
     ls -la "${NIX_ROOTFS_DIR}/mount"
+
+    # copy ../qemu/** into ${NIX_ROOTFS_DIR}/mount/opt/qemu-src
+    # create the directory if it doesn't exist
+    # sudo mkdir -p "${NIX_ROOTFS_DIR}/mount/opt/qemu-src"
+    # sudo cp -r ../qemu "${NIX_ROOTFS_DIR}/mount/opt/qemu-src"
 
     sudo umount "${NIX_ROOTFS_DIR}/mount"
 

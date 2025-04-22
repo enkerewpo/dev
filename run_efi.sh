@@ -30,9 +30,6 @@ if [ ! -w "$ROOTFS_PATH" ]; then
     sudo chmod 666 "$ROOTFS_PATH"
 fi
 
-# virt,dumpdtb=virt.dtb
-# dtc -I dtb -O dts -o virt.dts virt.dtb
-
 qemu-system-loongarch64 -m 16G -cpu la464 \
     -machine virt \
     -smp 1 -bios firmware/QEMU_EFI.fd -kernel $KERNEL_PATH \
@@ -40,6 +37,6 @@ qemu-system-loongarch64 -m 16G -cpu la464 \
     -drive file=$ROOTFS_PATH,format=raw,if=none,id=rootfs \
     -device virtio-blk-pci,drive=rootfs,bus=pcie.0,addr=0x5 \
     -serial mon:stdio \
-    -device igb,netdev=net0,bus=pcie.0,addr=0x6 \
+    -device virtio-net-pci,netdev=net0,bus=pcie.0,addr=0x6 \
     -netdev user,id=net0 \
     --nographic

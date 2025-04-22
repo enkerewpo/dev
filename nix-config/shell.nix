@@ -1,4 +1,6 @@
-{ pkgs ? import <nixpkgs> {} }:
+{ pkgs }:
+
+builtins.trace "[wheatfox] in shell.nix"
 
 pkgs.mkShell {
   buildInputs = with pkgs; [

@@ -35,6 +35,10 @@ This project provides a complete development environment for building and testin
 ## Some Notes
 
 1. export NIXPKGS_ALLOW_UNSUPPORTED_SYSTEM=1 (libseccomp)
+2. for not supported packages in nixpkgs (like systemd, qemu, rt-tests, etc.), we use the CLFS toolchain preinstalled on the host machine.
+3. download the CLFS toolchain from https://github.com/sunhaiyong1978/CLFS-for-LoongArch/releases/download/8.0/loongarch64-clfs-8.0-cross-tools-gcc-full.tar.xz and extract it, add `loongarch64-unknown-linux-gnu-*` to the `PATH` environment variable.
+4. echo "trusted-users = root $USER" | sudo tee -a /etc/nix/nix.conf
+5. sudo systemctl restart nix-daemon
 
 ## License
 
