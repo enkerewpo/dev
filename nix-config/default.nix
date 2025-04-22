@@ -1,8 +1,4 @@
-{ pkgs ? import <nixpkgs> {
-    config = import ./config.nix;
-    system = "loongarch64-linux";
-  }
-}:
+{ pkgs ? import <nixpkgs> }:
 
 pkgs.buildEnv {
   name = "loongarch64-rootfs";
@@ -22,7 +18,6 @@ pkgs.buildEnv {
     pciutils
     vim
     perf-tools
-    qemu
   ];
   
   extraOutputsToInstall = [ "dev" "bin" "out" ];

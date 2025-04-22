@@ -2,7 +2,7 @@
   description = "Loongarch64 Linux rootfs";
 
   inputs = {
-    nixpkgs.url = "github:enkerewpo/nixpkgs";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     nur.url = "github:nix-community/NUR";
   };
 
