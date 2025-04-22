@@ -32,6 +32,10 @@ This project provides a complete development environment for building and testin
    ```bash
    ./run_efi.sh
    ```
+## Some Notes
+
+1. export NIXPKGS_ALLOW_UNSUPPORTED_SYSTEM=1 (libseccomp)
+
 ## License
 
 Copyright (c) 2025 wheatfox

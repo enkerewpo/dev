@@ -2,10 +2,11 @@
   description = "Loongarch64 Linux rootfs";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    nixpkgs.url = "github:enkerewpo/nixpkgs";
+    nur.url = "github:nix-community/NUR";
   };
 
-  outputs = { self, nixpkgs }: let
+  outputs = { self, nixpkgs, nur }: let
     system = "x86_64-linux";
     pkgs = nixpkgs.legacyPackages.${system};
     

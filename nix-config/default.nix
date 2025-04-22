@@ -1,4 +1,8 @@
-{ pkgs }:
+{ pkgs ? import <nixpkgs> {
+    config = import ./config.nix;
+    system = "loongarch64-linux";
+  }
+}:
 
 pkgs.buildEnv {
   name = "loongarch64-rootfs";
@@ -6,28 +10,19 @@ pkgs.buildEnv {
     busybox
     coreutils
     bash
-    nix
     curl
     findutils
-    gawk
     gnugrep
     gnused
     gnutar
     gzip
-    gcc
-    btop
-    neofetch
     binutils
-    gnumake
-    iproute2
-    iptables
     glibc
     zlib
-    openssl
     pciutils
     vim
     perf-tools
-    libbpf
+    qemu
   ];
   
   extraOutputsToInstall = [ "dev" "bin" "out" ];

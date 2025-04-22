@@ -8,6 +8,8 @@
 
 set -euo pipefail
 
+export NIXPKGS_ALLOW_UNSUPPORTED_SYSTEM=1
+
 ###################
 # Configuration
 ###################
