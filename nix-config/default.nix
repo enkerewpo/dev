@@ -32,7 +32,6 @@ pkgs.buildEnv {
     echo "root::0:0:root:/root:/bin/bash" > $out/etc/passwd
     echo "root:x:0:" > $out/etc/group
     
-    # Add NixOS os-release information
     cat <<EOF > $out/etc/os-release
 NAME=NixOS
 ID=nixos
@@ -46,13 +45,13 @@ SUPPORT_URL="https://nixos.org/community.html"
 BUG_REPORT_URL="https://github.com/NixOS/nixpkgs/issues"
 EOF
     
-    # run mount sys /sys -t sysfs and mount proc /proc -t proc in rcS
-    # we first need to create the rcS script
     mkdir -p $out/etc/init.d
     cat <<EOF > $out/etc/init.d/rcS
 #!/bin/bash
 mount sys /sys -t sysfs
 mount proc /proc -t proc
+mount dev /dev -t devtmpfs
+mount run /run -t tmpfs
 EOF
     chmod +x $out/etc/init.d/rcS
   '';
