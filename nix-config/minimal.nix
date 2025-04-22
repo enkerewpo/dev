@@ -14,22 +14,14 @@ pkgs.buildEnv {
     gzip
     binutils
     glibc
-    glib
-    iproute2
     zlib
     pciutils
     vim
     perf-tools
     python3
-    meson
-    ninja
-    pkg-config
-    libtool
-    autoconf
-    automake
-    gcc
     file
-    dtc
+    qemu_kvm
+    systemd
   ];
 
   extraOutputsToInstall = [ "dev" "bin" "out" "man" ];
