@@ -1,5 +1,11 @@
 { pkgs }:
 
+let qemu_kvm_loongarch = pkgs.qemu_kvm.override {
+  minimal = true;
+};
+
+in
+
 pkgs.buildEnv {
   name = "loongarch64-rootfs";
   paths = with pkgs; [
@@ -12,7 +18,10 @@ pkgs.buildEnv {
     gnused
     gnutar
     gzip
+    glib
     binutils
+    fastfetch
+    htop
     glibc
     zlib
     pciutils
@@ -20,8 +29,10 @@ pkgs.buildEnv {
     perf-tools
     python3
     file
-    qemu_kvm
-    systemd
+    qemu_kvm_loongarch
+    libvirt
+    rt-tests
+    OVMF
   ];
 
   extraOutputsToInstall = [ "dev" "bin" "out" "man" ];

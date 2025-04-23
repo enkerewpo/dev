@@ -188,15 +188,17 @@ build_nix_rootfs() {
 
     export NIXPKGS_ALLOW_UNSUPPORTED_SYSTEM=1
 
-    # Build the rootfs using Nix
-    if ! nix-build --impure --show-trace --no-sandbox -A image --out-link "${NIX_ROOTFS_DIR}/rootfs.ext4"; then
-        die "Failed to build Nix rootfs image"
-    fi
+    NIX_BUILD_CMD1="nix-build --impure --show-trace --no-sandbox --log-format bar -A image --out-link ${NIX_ROOTFS_DIR}/rootfs.ext4"
+    NIX_BUILD_CMD2="nix-build --impure --show-trace --no-sandbox --log-format bar -A rootfs --out-link ${NIX_ROOTFS_DIR}/rootfs.ext4.link"
 
-    if ! nix-build --impure --show-trace --no-sandbox -A rootfs --out-link "${NIX_ROOTFS_DIR}/rootfs.ext4.link"; then
-        die "Failed to build Nix rootfs content"
-    fi
+    # create a list of commands to run
+    NIX_BUILD_CMDS=("${NIX_BUILD_CMD1}" "${NIX_BUILD_CMD2}")
 
+    for cmd in "${NIX_BUILD_CMDS[@]}"; do
+        if ! eval "${cmd}"; then
+            die "Failed to build Nix rootfs, failed command: ${cmd}"
+        fi
+    done
     if [[ ! -d "${NIX_ROOTFS_DIR}/mount" ]]; then
         mkdir -p "${NIX_ROOTFS_DIR}/mount"
     fi
@@ -370,10 +372,10 @@ build_kernel() {
     log_info "Generating debug information"
     if [[ ${USE_LLVM} -eq 1 ]]; then
         "${LLVM_READELF}" -a "${LINUX_SRC_DIR}/vmlinux" >"${LINUX_SRC_DIR}/vmlinux.readelf.txt"
-        "${LLVM_OBJDUMP}" -d "${LINUX_SRC_DIR}/vmlinux" >"${LINUX_SRC_DIR}/vmlinux.asm"
+        # "${LLVM_OBJDUMP}" -d "${LINUX_SRC_DIR}/vmlinux" >"${LINUX_SRC_DIR}/vmlinux.asm"
     else
         "${GNU_READELF}" -a "${LINUX_SRC_DIR}/vmlinux" >"${LINUX_SRC_DIR}/vmlinux.readelf.txt"
-        "${GNU_OBJDUMP}" -d "${LINUX_SRC_DIR}/vmlinux" >"${LINUX_SRC_DIR}/vmlinux.asm"
+        # "${GNU_OBJDUMP}" -d "${LINUX_SRC_DIR}/vmlinux" >"${LINUX_SRC_DIR}/vmlinux.asm"
     fi
 
     log_info "Generating compile_commands.json"
@@ -445,11 +447,20 @@ show_help() {
     } | less -R
 }
 
+get_compiler_details() {
+    if [[ ${USE_LLVM} -eq 1 ]]; then
+        "${CLANG}" --version
+    else
+        "${GNU_GCC}" --version
+    fi
+}
+
 show_status() {
     log_info "Build Status:"
     echo "  Kernel Version: linux-${CHOSEN}"
     echo "  Architecture: ${ARCH}"
-    echo "  Compiler: ${LLVM:+LLVM }Clang"
+    echo "  Compiler: $(get_compiler_details)"
+    echo "  Host Nix: $(nix --version)"
     echo "  Rust Support: Enabled (${RUST_VERSION}+)"
     echo "  Build Config: ${TARGET_DEFCONFIG}"
     echo "  Build Ready: $([[ -f "${FLAG}" ]] && echo "Yes" || echo "No (run 'build def' first)")"
@@ -468,6 +479,7 @@ check_build_env() {
 
 main() {
     setup_workspace
+    init_submodules
 
     # Call setup_toolchain early in the script
     setup_toolchain
