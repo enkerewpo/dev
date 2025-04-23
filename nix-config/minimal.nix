@@ -18,21 +18,18 @@ pkgs.buildEnv {
     gnused
     gnutar
     gzip
-    glib
     binutils
     fastfetch
-    htop
     glibc
     zlib
     pciutils
     vim
+    systemd
     perf-tools
-    python3
     file
     qemu_kvm_loongarch
-    libvirt
     rt-tests
-    OVMF
+    libvirt
   ];
 
   extraOutputsToInstall = [ "dev" "bin" "out" "man" ];
