@@ -1,0 +1,4 @@
+[Unit]
+Description=Rescue Mode
+Requires=rescue.service
+After=rescue.service 

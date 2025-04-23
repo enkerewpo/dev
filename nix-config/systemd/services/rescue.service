@@ -1,0 +1,12 @@
+[Unit]
+Description=Rescue Shell
+DefaultDependencies=no
+Conflicts=shutdown.target
+
+[Service]
+Type=idle
+ExecStart=-/bin/sh
+StandardInput=tty-force
+StandardOutput=inherit
+StandardError=inherit
+TTYPath=/dev/console 

@@ -1,0 +1,6 @@
+[Unit]
+Description=Serial Console Getty
+Documentation=man:systemd.special(7)
+Requires=basic.target
+After=basic.target
+AllowIsolate=yes 
