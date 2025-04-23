@@ -1,12 +1,32 @@
 { pkgs }:
 
-let qemu_kvm_loongarch = pkgs.qemu_kvm.override {
-  minimal = true;
-};
+let
+  qemu_loongarch = (pkgs.qemu_kvm.override {
+    hostCpuOnly = true;
+    alsaSupport = false;
+    pulseSupport = false;
+    sdlSupport = false;
+    jackSupport = false;
+    gtkSupport = false;
+    vncSupport = false;
+    smartcardSupport = false;
+    spiceSupport = false;
+    ncursesSupport = false;
+    libiscsiSupport = false;
+    tpmSupport = false;
+    numaSupport = false;
+    seccompSupport = false;
+    guestAgentSupport = false;
+    minimal = true;
+  }).overrideAttrs (super: {
+    buildInputs = super.buildInputs ++ [
+      pkgs.git
+      pkgs.dtc
+      pkgs.pkg-config
+    ];
+  });
 
-in
-
-pkgs.buildEnv {
+in pkgs.buildEnv {
   name = "loongarch64-rootfs";
   paths = with pkgs; [
     busybox
@@ -27,13 +47,12 @@ pkgs.buildEnv {
     systemd
     perf-tools
     file
-    qemu_kvm_loongarch
+    qemu_loongarch
     rt-tests
     libvirt
   ];
 
   extraOutputsToInstall = [ "dev" "bin" "out" "man" ];
   pathsToLink = [ "/bin" "/sbin" "/lib" "/share" "/etc" "/share/man" ];
-  buildInputs = with pkgs; [ gcc binutils ];
   postBuild = builtins.readFile ./post-build.sh;
-} 
+}
