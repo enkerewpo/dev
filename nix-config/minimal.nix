@@ -52,9 +52,6 @@ in pkgs.buildEnv {
     python3
     python3.pkgs.setuptools
     python3.pkgs.wheel
-    python3.pkgs.pip
-    python3.pkgs.virtualenv
-    python3.pkgs.pipx
     dhcpcd
     iproute2
     iputils
