@@ -1,6 +1,6 @@
 #!/bin/bash
 # SPDX-License-Identifier: GPL-2.0-or-later
-# Copyright (c) 2024-2025 wheatfox <wheatfox17@icloud.com>
+# Copyright (c) 2025 wheatfox <wheatfox17@icloud.com>
 #
 # Linux Kernel Development Build Script
 # This script manages the build process for Linux kernel with Rust support,
@@ -17,11 +17,11 @@ export NIXPKGS_ALLOW_UNSUPPORTED_SYSTEM=1
 # Build configuration (these can be readonly)
 readonly ARCH="loongarch"
 readonly CROSS_COMPILE="loongarch64-unknown-linux-gnu-"
-readonly TARGET_DEFCONFIG="loongson3_wheatfox_defconfig"
+readonly TARGET_DEFCONFIG="wheatfox_defconfig"
 readonly LOG_DIR="build_logs"
 
 # Dynamic configuration (these should not be readonly)
-USE_LLVM=${USE_LLVM:-1} # Can be overridden by environment variable
+USE_LLVM=${USE_LLVM:-1} # Can be overridden by environment variable, default is 1
 LLVM_HOME=${LLVM_HOME:-"/home/wheatfox/tryredox/clang+llvm-18.1.8-x86_64-linux-gnu-ubuntu-18.04/bin"}
 NUM_JOBS=$(nproc)
 
@@ -43,9 +43,15 @@ GNU_OBJCOPY=""
 GNU_READELF=""
 GNU_OBJDUMP=""
 
+# LLVM library paths
+LLVM_LIB_PATH="${LLVM_HOME}/../lib"
+export LD_LIBRARY_PATH="${LLVM_LIB_PATH}:${LD_LIBRARY_PATH:-}"
+
 # Rust configuration
 RUST_VERSION="1.75.0"
 RUST_FLAGS="-Copt-level=2"
+RUSTC=$(command -v rustc)
+RUST_LIB_SRC="$(${RUSTC} --print sysroot)/lib/rustlib/src/rust/library"
 
 # Nix configuration
 NIX_ROOTFS_DIR="nix-rootfs"
@@ -149,6 +155,9 @@ check_rust() {
     if [[ "$(printf '%s\n' "${RUST_VERSION}" "${installed_version}" | sort -V | head -n1)" != "${RUST_VERSION}" ]]; then
         die "Rust version ${RUST_VERSION} or higher is required (found ${installed_version})"
     fi
+    # print RUST_LIB_SRC and export it
+    log_info "RUST_LIB_SRC=${RUST_LIB_SRC}"
+    export RUST_LIB_SRC
 }
 
 init_submodules() {
@@ -283,6 +292,11 @@ setup_toolchain() {
         [[ -n "${LLVM_READELF}" ]] || die "llvm-readelf not found"
         [[ -n "${LLVM_OBJDUMP}" ]] || die "llvm-objdump not found"
 
+        # Set LLVM library path
+        LLVM_LIB_PATH="${LLVM_HOME}/../lib"
+        export LD_LIBRARY_PATH="${LLVM_LIB_PATH}:${LD_LIBRARY_PATH:-}"
+        log_info "LLVM library path: ${LLVM_LIB_PATH}"
+
         log_info "LLVM toolchain configuration:"
         log_info "  CLANG: ${CLANG}"
         log_info "  LLD: ${LLD}"
@@ -315,28 +329,26 @@ get_make_args() {
         args+=" LD=${LLD}"
         args+=" OBJCOPY=${LLVM_OBJCOPY}"
         args+=" READELF=${LLVM_READELF}"
+        # remove CROSS_COMPILE from args
+        args=$(echo "${args}" | sed "s/${CROSS_COMPILE}//g")
     fi
 
     echo "${args}"
 }
 
 run_defconfig() {
-    log_info "Running defconfig"
-    # shellcheck disable=SC2046
+    log_info "Running defconfig, using ${TARGET_DEFCONFIG}"
     make $(get_make_args) "${TARGET_DEFCONFIG}"
-    echo "ROOT" >"${FLAG}"
 }
 
 clean_build() {
     log_info "Cleaning the build"
-    # shellcheck disable=SC2046
     make $(get_make_args) clean
     rm -f "${FLAG}"
 }
 
 run_menuconfig() {
     log_info "Running menuconfig"
-    # shellcheck disable=SC2046
     make $(get_make_args) menuconfig
 }
 
@@ -346,24 +358,26 @@ save_defconfig() {
 }
 
 build_kernel() {
-    [[ ! -f "${FLAG}" ]] && die "Please run 'build def' first"
-
-    check_rust
 
     log_info "Building kernel with:"
     log_info "  USE_LLVM=${USE_LLVM}"
     log_info "  Jobs=${NUM_JOBS}"
     log_info "  Rust support enabled"
 
-    # Enable Rust support in kernel config
-    if ! grep -q "CONFIG_RUST=y" "${LINUX_SRC_DIR}/.config" 2>/dev/null; then
-        log_info "Enabling Rust support in kernel config"
-        echo "CONFIG_RUST=y" >>"${LINUX_SRC_DIR}/.config"
-    fi
+    # Check Rust availability
+    log_info "Checking Rust availability for kernel build"
+
+    cmd="make $(get_make_args) rustavailable"
+    # echo "${cmd}"
+    eval "${cmd}"
 
     local build_log="${LOG_DIR}/build_$(date +%Y%m%d_%H%M%S).log"
 
-    # shellcheck disable=SC2046
+    # check .config to have CONFIG_RUST=y
+    if ! grep -q "CONFIG_RUST=y" "${LINUX_SRC_DIR}/.config"; then
+        die "CONFIG_RUST is not enabled in .config"
+    fi
+
     if ! make $(get_make_args) -j"${NUM_JOBS}" 2>&1 | tee "${build_log}"; then
         log_error "Build failed. See ${build_log} for details"
         exit 1
@@ -379,9 +393,39 @@ build_kernel() {
     fi
 
     log_info "Generating compile_commands.json"
-    (cd "${LINUX_SRC_DIR}" && python3 scripts/clang-tools/gen_compile_commands.py)
+    cd "${LINUX_SRC_DIR}"
+    python3 scripts/clang-tools/gen_compile_commands.py
+
+    # Remove the rust-analyzer generation step since it's no longer supported
+    # log_info "Generating rust-project.json for rust-analyzer"
+    log_info "Generating rust-project.json for rust-analyzer"
+    # Set required environment variables
+    export RUSTC
+    export BINDGEN=$(command -v bindgen)
+    export CC="${CLANG}"
+    export RUST_LIB_SRC
+    cmd="make $(get_make_args) rust-analyzer"
+    echo "${cmd}"
+    eval "${cmd}"
 
     log_info "Build completed successfully"
+}
+
+# Remove the separate check_rust_available and generate_rust_analyzer functions
+
+install_bindgen() {
+    log_info "Installing bindgen-cli"
+    cargo install --locked bindgen-cli
+}
+
+run_rust_tests() {
+    log_info "Running Rust tests"
+    make $(get_make_args) rusttest
+}
+
+generate_rust_docs() {
+    log_info "Generating Rust documentation"
+    make $(get_make_args) rustdocs
 }
 
 build_rootfs() {
@@ -416,6 +460,9 @@ show_help() {
         echo -e "    ${BOLD}${GREEN}rootfs${RESET}      Build the root filesystem using Nix"
         echo -e "    ${BOLD}${GREEN}status${RESET}      Show build status and configuration"
         echo -e "    ${BOLD}${GREEN}check${RESET}       Check build dependencies"
+        echo -e "    ${BOLD}${GREEN}install-bindgen${RESET}  Install bindgen-cli tool"
+        echo -e "    ${BOLD}${GREEN}rust-test${RESET}        Run Rust tests"
+        echo -e "    ${BOLD}${GREEN}rust-docs${RESET}        Generate Rust documentation"
         echo
 
         echo -e "${BOLD}${YELLOW}Build Options:${RESET}"
@@ -479,11 +526,12 @@ check_build_env() {
 
 main() {
     setup_workspace
-    init_submodules
+    # init_submodules
 
     # Call setup_toolchain early in the script
+    check_rust
     setup_toolchain
-
+    
     case "${1:-help}" in
     help | -h | --help) show_help ;;
     def) run_defconfig ;;
@@ -494,6 +542,9 @@ main() {
     rootfs) build_rootfs ;;
     status) show_status ;;
     check) check_build_env ;;
+    install-bindgen) install_bindgen ;;
+    rust-test) run_rust_tests ;;
+    rust-docs) generate_rust_docs ;;
     *)
         log_error "Unknown command: ${1}"
         show_help
