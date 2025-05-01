@@ -27,7 +27,6 @@ vmlinux.readelf.txt
 compile_commands.json
 
 # Editor specific
-.vscode/
 .idea/
 *.swp
 *.swo

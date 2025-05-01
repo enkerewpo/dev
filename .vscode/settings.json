@@ -1,0 +1,7 @@
+{
+    "git.ignoreLimitWarning": true,
+    "rust-analyzer.linkedProjects": [
+        "linux-git/rust-project.json"
+    ],
+    "rust-analyzer.inlayHints.parameterHints.enable": true,
+}
