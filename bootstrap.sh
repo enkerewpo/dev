@@ -442,56 +442,50 @@ show_help() {
     local GREEN="\033[32m"
     local CYAN="\033[36m"
 
-    {
-        echo -e "${BOLD}${WHITE}Linux Kernel Build Script${RESET}"
-        echo -e "${BOLD}wheatfox (wheatfox17@.icloud.com) ${RESET}\n"
+    echo -e "${BOLD}${WHITE}Linux Kernel Development Bootstrap${RESET}"
+    echo -e "${BOLD}wheatfox (wheatfox17@.icloud.com) ${RESET}\n"
 
-        echo -e "${BOLD}${YELLOW}Usage:${RESET}"
-        echo "    ./build.sh [command]"
-        echo
+    echo -e "${BOLD}${YELLOW}Usage:${RESET}"
+    echo "    $0 [command]"
+    echo
 
-        echo -e "${BOLD}${YELLOW}Commands:${RESET}"
-        echo -e "    ${BOLD}${GREEN}help${RESET}        Show this help message"
-        echo -e "    ${BOLD}${GREEN}def${RESET}         Run defconfig and initialize build"
-        echo -e "    ${BOLD}${GREEN}clean${RESET}       Clean the build artifacts"
-        echo -e "    ${BOLD}${GREEN}menuconfig${RESET}  Run kernel menuconfig"
-        echo -e "    ${BOLD}${GREEN}save${RESET}        Save current config as defconfig"
-        echo -e "    ${BOLD}${GREEN}kernel${RESET}      Build the kernel (requires def first)"
-        echo -e "    ${BOLD}${GREEN}rootfs${RESET}      Build the root filesystem using Nix"
-        echo -e "    ${BOLD}${GREEN}status${RESET}      Show build status and configuration"
-        echo -e "    ${BOLD}${GREEN}check${RESET}       Check build dependencies"
-        echo -e "    ${BOLD}${GREEN}install-bindgen${RESET}  Install bindgen-cli tool"
-        echo -e "    ${BOLD}${GREEN}rust-test${RESET}        Run Rust tests"
-        echo -e "    ${BOLD}${GREEN}rust-docs${RESET}        Generate Rust documentation"
-        echo
+    echo -e "${BOLD}${YELLOW}Commands:${RESET}"
+    echo -e "    ${BOLD}${GREEN}help${RESET}        Show this help message"
+    echo -e "    ${BOLD}${GREEN}def${RESET}         Run defconfig and initialize build"
+    echo -e "    ${BOLD}${GREEN}clean${RESET}       Clean the build artifacts"
+    echo -e "    ${BOLD}${GREEN}menu${RESET}        Run kernel menuconfig"
+    echo -e "    ${BOLD}${GREEN}save${RESET}        Save current config as defconfig"
+    echo -e "    ${BOLD}${GREEN}kernel${RESET}      Build the kernel (requires def first)"
+    echo -e "    ${BOLD}${GREEN}rootfs${RESET}      Build the root filesystem using Nix"
+    echo -e "    ${BOLD}${GREEN}status${RESET}      Show build status and configuration"
+    echo -e "    ${BOLD}${GREEN}check${RESET}       Check build dependencies"
+    # echo -e "    ${BOLD}${GREEN}install-bindgen${RESET}  Install bindgen-cli tool"
+    echo -e "    ${BOLD}${GREEN}rust-test${RESET}   Run Rust tests"
+    # echo -e "    ${BOLD}${GREEN}rust-docs${RESET}   Generate Rust documentation"
+    echo
 
-        echo -e "${BOLD}${YELLOW}Build Options:${RESET}"
-        echo -e "    ${BOLD}${CYAN}USE_LLVM=${RESET}0|1     Enable/disable LLVM toolchain (default: 1)"
-        echo -e "    ${BOLD}${CYAN}LLVM_HOME=${RESET}<path>  Set custom LLVM tools path"
-        echo
+    echo -e "${BOLD}${YELLOW}Build Options:${RESET}"
+    echo -e "    ${BOLD}${CYAN}USE_LLVM=${RESET}0|1     Enable/disable LLVM toolchain (default: 1)"
+    echo -e "    ${BOLD}${CYAN}LLVM_HOME=${RESET}<path>  Set custom LLVM tools path"
+    echo
 
-        echo -e "${BOLD}${YELLOW}Examples:${RESET}"
-        echo "    ./build.sh def                    # Configure kernel"
-        echo "    ./build.sh kernel                 # Build kernel with LLVM"
-        echo "    USE_LLVM=0 ./build.sh kernel     # Build kernel with GNU toolchain"
-        echo "    LLVM_HOME=/opt/llvm ./build.sh   # Use custom LLVM path"
-        echo
+    echo -e "${BOLD}${YELLOW}Examples:${RESET}"
+    echo "    $0 def                    # Configure kernel"
+    echo "    $0 kernel                 # Build kernel with LLVM"
+    echo "    USE_LLVM=0 $0 kernel      # Build kernel with GNU toolchain"
+    echo "    LLVM_HOME=/opt/llvm $0    # Use custom LLVM path"
+    echo
 
-        echo -e "${BOLD}${YELLOW}Toolchain:${RESET}"
-        echo "    LLVM: Uses clang ${LLVM_VERSION:-18+} for kernel compilation"
-        echo "    GNU:  Uses ${GNU_PREFIX} toolchain"
-        echo
+    echo -e "${BOLD}${YELLOW}Toolchain:${RESET}"
+    echo "    LLVM: Uses clang ${LLVM_VERSION:-18+} for kernel compilation"
+    echo "    GNU:  Uses ${GNU_PREFIX} toolchain"
+    echo
 
-        echo -e "${BOLD}${YELLOW}Configuration:${RESET}"
-        echo "    Architecture:  ${ARCH}"
-        echo "    Target:        ${TARGET_DEFCONFIG}"
-        echo "    Jobs:          ${NUM_JOBS}"
-        echo
-
-        echo -e "${BOLD}${YELLOW}More Information:${RESET}"
-        echo "    Repository:  https://github.com/enkerewpo/nix-loongarch64"
-        echo "    License:     GPL-2.0-or-later"
-    } | less -R
+    echo -e "${BOLD}${YELLOW}Current Configuration:${RESET}"
+    echo "    Architecture:  ${ARCH}"
+    echo "    Target:        ${TARGET_DEFCONFIG}"
+    echo "    Jobs:          ${NUM_JOBS}"
+    echo
 }
 
 get_compiler_details() {
@@ -524,19 +518,54 @@ check_build_env() {
 # Main
 ###################
 
-main() {
-    setup_workspace
-    # init_submodules
+# Function to find the closest matching command
+find_closest_command() {
+    local input=$1
+    local min_distance=999
+    local closest_command=""
+    local commands=("help" "def" "clean" "menu" "save" "kernel" "rootfs" "status" "check" "install-bindgen" "rust-test" "rust-docs")
 
-    # Call setup_toolchain early in the script
-    check_rust
-    setup_toolchain
+    for cmd in "${commands[@]}"; do
+        # Calculate Levenshtein distance
+        local distance=$(echo "$input" | awk -v cmd="$cmd" '
+            function min(a, b) { return a < b ? a : b }
+            function levenshtein(s1, s2,    l1, l2, i, j, m, n, d) {
+                l1 = length(s1)
+                l2 = length(s2)
+                for (i = 0; i <= l1; i++) d[i,0] = i
+                for (j = 0; j <= l2; j++) d[0,j] = j
+                for (i = 1; i <= l1; i++) {
+                    for (j = 1; j <= l2; j++) {
+                        m = (substr(s1, i, 1) == substr(s2, j, 1)) ? 0 : 1
+                        d[i,j] = min(min(d[i-1,j] + 1, d[i,j-1] + 1), d[i-1,j-1] + m)
+                    }
+                }
+                return d[l1,l2]
+            }
+            { print levenshtein($0, cmd) }
+        ')
+        
+        if [ "$distance" -lt "$min_distance" ]; then
+            min_distance=$distance
+            closest_command=$cmd
+        fi
+    done
+
+    echo "$closest_command"
+}
+
+main() {
+    # Initialize environment and exit on any error
+    setup_workspace || exit 1
+    # init_submodules
+    check_rust || exit 1
+    setup_toolchain || exit 1
     
     case "${1:-help}" in
     help | -h | --help) show_help ;;
     def) run_defconfig ;;
     clean) clean_build ;;
-    menuconfig) run_menuconfig ;;
+    menu) run_menuconfig ;;
     save) save_defconfig ;;
     kernel) build_kernel ;;
     rootfs) build_rootfs ;;
@@ -547,6 +576,10 @@ main() {
     rust-docs) generate_rust_docs ;;
     *)
         log_error "Unknown command: ${1}"
+        closest=$(find_closest_command "${1}")
+        if [ -n "$closest" ]; then
+            log_info "Did you mean: $0 $closest ?"
+        fi
         show_help
         ;;
     esac
