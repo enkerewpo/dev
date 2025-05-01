@@ -4,4 +4,20 @@
         "linux-git/rust-project.json"
     ],
     "rust-analyzer.inlayHints.parameterHints.enable": true,
+    "nix.enableLanguageServer": true,
+    "nix.serverPath": "nixd",
+    "nix.serverSettings": {
+        // check https://github.com/nix-community/nixd/blob/main/nixd/docs/configuration.md for all nixd config
+        "nixd": {
+            "formatting": {
+                "command": [
+                    "nixfmt"
+                ],
+            },
+            "options": {
+               
+            },
+        }
+    },
+    "nixEnvSelector.suggestion": false
 }
