@@ -433,6 +433,26 @@ build_rootfs() {
     build_nix_rootfs
 }
 
+run_rust_kunit_tests() {
+    log_info "Running Rust KUnit (doctest) tests for loongarch"
+    local kunit_py="${LINUX_SRC_DIR}/tools/testing/kunit/kunit.py"
+    if [[ ! -f "$kunit_py" ]]; then
+        die "kunit.py not found at $kunit_py"
+    fi
+    # Ensure python3 is available
+    if ! command -v python3 >/dev/null 2>&1; then
+        die "python3 is required to run kunit.py"
+    fi
+    # Run kunit.py with required options
+    (cd "${LINUX_SRC_DIR}" && \
+        python3 tools/testing/kunit/kunit.py run \
+            --make_options "LLVM=1" \
+            --arch=loongarch \
+            --kconfig_add CONFIG_RUST=y \
+            --kconfig_add CONFIG_KUNIT=y \
+            --kconfig_add CONFIG_RUST_KERNEL_DOCTESTS=y)
+}
+
 show_help() {
     # Color codes
     local RESET="\033[0m"
@@ -461,7 +481,8 @@ show_help() {
     echo -e "    ${BOLD}${GREEN}check${RESET}       Check build dependencies"
     # echo -e "    ${BOLD}${GREEN}install-bindgen${RESET}  Install bindgen-cli tool"
     echo -e "    ${BOLD}${GREEN}rust-test${RESET}   Run Rust tests"
-    # echo -e "    ${BOLD}${GREEN}rust-docs${RESET}   Generate Rust documentation"
+    echo -e "    ${BOLD}${GREEN}rust-kunit-test${RESET}   Run Rust KUnit (doctest) tests for loongarch"
+    echo -e "    ${BOLD}${GREEN}rust-docs${RESET}   Generate Rust documentation"
     echo
 
     echo -e "${BOLD}${YELLOW}Build Options:${RESET}"
@@ -523,7 +544,7 @@ find_closest_command() {
     local input=$1
     local min_distance=999
     local closest_command=""
-    local commands=("help" "def" "clean" "menu" "save" "kernel" "rootfs" "status" "check" "install-bindgen" "rust-test" "rust-docs")
+    local commands=("help" "def" "clean" "menu" "save" "kernel" "rootfs" "status" "check" "install-bindgen" "rust-test" "rust-kunit-test" "rust-docs")
 
     for cmd in "${commands[@]}"; do
         # Calculate Levenshtein distance
@@ -573,6 +594,7 @@ main() {
     check) check_build_env ;;
     install-bindgen) install_bindgen ;;
     rust-test) run_rust_tests ;;
+    rust-kunit-test) run_rust_kunit_tests ;;
     rust-docs) generate_rust_docs ;;
     *)
         log_error "Unknown command: ${1}"
