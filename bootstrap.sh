@@ -22,7 +22,7 @@ readonly LOG_DIR="build_logs"
 
 # Dynamic configuration (these should not be readonly)
 USE_LLVM=${USE_LLVM:-1} # Can be overridden by environment variable, default is 1
-LLVM_HOME=${LLVM_HOME:-"/home/wheatfox/tryredox/clang+llvm-18.1.8-x86_64-linux-gnu-ubuntu-18.04/bin"}
+LLVM_HOME=${LLVM_HOME:-"/usr/lib/llvm-19/bin"}
 NUM_JOBS=$(nproc)
 
 # Variables for workspace paths (will be set in setup_workspace)
@@ -125,8 +125,12 @@ check_dependencies() {
     # Check LLVM tools
     [[ ! -x "${CLANG}" ]] && missing_deps+=("clang")
     [[ ! -x "${LLD}" ]] && missing_deps+=("lld")
+    [[ ! -x "${LLVM_AR}" ]] && missing_deps+=("llvm-ar")
+    [[ ! -x "${LLVM_NM}" ]] && missing_deps+=("llvm-nm")
+    [[ ! -x "${LLVM_STRIP}" ]] && missing_deps+=("llvm-strip")
     [[ ! -x "${LLVM_OBJCOPY}" ]] && missing_deps+=("llvm-objcopy")
     [[ ! -x "${LLVM_READELF}" ]] && missing_deps+=("llvm-readelf")
+    [[ ! -x "${LLVM_OBJDUMP}" ]] && missing_deps+=("llvm-objdump")
 
     # Check GNU tools
     command -v "${GNU_GCC}" >/dev/null 2>&1 || missing_deps+=("${GNU_GCC}")
@@ -227,6 +231,12 @@ build_nix_rootfs() {
     # copy the contents of the rootfs.ext4.link to the mount directory
     sudo cp -r "${NIX_ROOTFS_DIR}/rootfs.ext4.link"/* "${NIX_ROOTFS_DIR}/mount"
     
+    sudo cp -r overlay/* "${NIX_ROOTFS_DIR}/mount"
+
+    # copy modules
+    sudo mkdir -p "${NIX_ROOTFS_DIR}/mount/lib/modules"
+    sudo cp -r "${LINUX_SRC_DIR}/../modules-install"/lib/modules/* "${NIX_ROOTFS_DIR}/mount/lib/modules"
+
     ls -la "${NIX_ROOTFS_DIR}/mount"
 
     # copy ../qemu/** into ${NIX_ROOTFS_DIR}/mount/opt/qemu-src
@@ -284,6 +294,9 @@ setup_toolchain() {
         LLVM_OBJCOPY=$(find_tool "llvm-objcopy")
         LLVM_READELF=$(find_tool "llvm-readelf")
         LLVM_OBJDUMP=$(find_tool "llvm-objdump")
+        LLVM_AR=$(find_tool "llvm-ar")
+        LLVM_NM=$(find_tool "llvm-nm")
+        LLVM_STRIP=$(find_tool "llvm-strip")
 
         # Verify all LLVM tools are found
         [[ -n "${CLANG}" ]] || die "clang not found"
@@ -291,6 +304,9 @@ setup_toolchain() {
         [[ -n "${LLVM_OBJCOPY}" ]] || die "llvm-objcopy not found"
         [[ -n "${LLVM_READELF}" ]] || die "llvm-readelf not found"
         [[ -n "${LLVM_OBJDUMP}" ]] || die "llvm-objdump not found"
+        [[ -n "${LLVM_AR}" ]] || die "llvm-ar not found"
+        [[ -n "${LLVM_NM}" ]] || die "llvm-nm not found"
+        [[ -n "${LLVM_STRIP}" ]] || die "llvm-strip not found"
 
         # Set LLVM library path
         LLVM_LIB_PATH="${LLVM_HOME}/../lib"
@@ -300,6 +316,9 @@ setup_toolchain() {
         log_info "LLVM toolchain configuration:"
         log_info "  CLANG: ${CLANG}"
         log_info "  LLD: ${LLD}"
+        log_info "  AR: ${LLVM_AR}"
+        log_info "  NM: ${LLVM_NM}"
+        log_info "  STRIP: ${LLVM_STRIP}"
         log_info "  OBJCOPY: ${LLVM_OBJCOPY}"
         log_info "  READELF: ${LLVM_READELF}"
         log_info "  OBJDUMP: ${LLVM_OBJDUMP}"
@@ -327,8 +346,12 @@ get_make_args() {
         args+=" LLVM=1"
         args+=" CC=${CLANG}"
         args+=" LD=${LLD}"
-        args+=" OBJCOPY=${LLVM_OBJCOPY}"
+        args+=" AR=${LLVM_AR}"
+        args+=" NM=${LLVM_NM}"
+        args+=" STRIP=${LLVM_STRIP}"
+        args+=" OBJDUMP=${LLVM_OBJDUMP}"
         args+=" READELF=${LLVM_READELF}"
+        args+=" LLVM_LINKER=${LLD}"
         # remove CROSS_COMPILE from args
         args=$(echo "${args}" | sed "s/${CROSS_COMPILE}//g")
     fi
@@ -363,6 +386,8 @@ build_kernel() {
     log_info "  USE_LLVM=${USE_LLVM}"
     log_info "  Jobs=${NUM_JOBS}"
     log_info "  Rust support enabled"
+
+    rm -rf "${LINUX_SRC_DIR}/../modules-install"
 
     # Check Rust availability
     log_info "Checking Rust availability for kernel build"
@@ -408,6 +433,8 @@ build_kernel() {
     echo "${cmd}"
     eval "${cmd}"
 
+    # install modules to ../modules-install
+    make $(get_make_args) modules_install INSTALL_MOD_PATH="${LINUX_SRC_DIR}/../modules-install"
     log_info "Build completed successfully"
 }
 

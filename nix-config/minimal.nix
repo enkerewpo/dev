@@ -35,23 +35,24 @@ in pkgs.buildEnv {
     gnutar
     gzip
     binutils
-    fastfetch
+    # fastfetch
     glibc
     pciutils
     vim
     systemd
     perf-tools
+    strace
     file
-    qemu_loongarch
-    rt-tests
+    # qemu_loongarch
+    # rt-tests
     util-linux
     htop
     ncurses
-    nix
-    glib
-    python3
-    python3.pkgs.setuptools
-    python3.pkgs.wheel
+    # nix
+    # glib
+    # python3
+    # python3.pkgs.setuptools
+    # python3.pkgs.wheel
     dhcpcd
     iproute2
     iputils
