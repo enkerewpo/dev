@@ -231,7 +231,7 @@ build_nix_rootfs() {
     # copy the contents of the rootfs.ext4.link to the mount directory
     sudo cp -r "${NIX_ROOTFS_DIR}/rootfs.ext4.link"/* "${NIX_ROOTFS_DIR}/mount"
     
-    sudo cp -r overlay/* "${NIX_ROOTFS_DIR}/mount"
+    # sudo cp -r overlay/* "${NIX_ROOTFS_DIR}/mount"
 
     # copy modules
     sudo mkdir -p "${NIX_ROOTFS_DIR}/mount/lib/modules"

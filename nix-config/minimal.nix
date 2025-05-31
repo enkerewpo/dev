@@ -21,6 +21,9 @@ let
   }).overrideAttrs (super: {
     buildInputs = super.buildInputs ++ [ pkgs.git pkgs.dtc pkgs.pkg-config ];
   });
+  util-linux = pkgs.util-linux.overrideAttrs (super: {
+    buildInputs = super.buildInputs ++ [ pkgs.pkg-config ];
+  });
 
 in pkgs.buildEnv {
   name = "loongarch64-rootfs";
@@ -35,11 +38,11 @@ in pkgs.buildEnv {
     gnutar
     gzip
     binutils
-    # fastfetch
+    fastfetch
     glibc
     pciutils
     vim
-    systemd
+    # systemd
     perf-tools
     strace
     file
@@ -56,6 +59,9 @@ in pkgs.buildEnv {
     dhcpcd
     iproute2
     iputils
+    # add ebpf stuff
+    bpftools
+    libbpf
   ];
 
   extraOutputsToInstall = [
