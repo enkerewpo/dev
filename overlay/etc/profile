@@ -1,0 +1,32 @@
+export PATH="/bin:/sbin:/usr/bin:/usr/sbin"
+
+
+YELLOW_START="\033[33m"
+YELLOW_END="\033[0m"
+BOLD_START="\033[1m"
+BOLD_END="\033[0m"
+GREEN_START="\033[32m"
+GREEN_END="\033[0m"
+BLUE_START="\033[34m"
+BLUE_END="\033[0m"
+
+if [ "$PS1" ]; then
+    if [ "$(id -u)" -eq 0 ]; then
+        # add color
+        # export PS1='[\u@\h \W]# '
+        export PS1='\[\033[32m\]\u\[\033[0m\]@\[\033[34m\]\h\[\033[0m\] \[\033[34m\]\w\[\033[0m\]# '
+    else
+        export PS1='\[\033[32m\]\u\[\033[0m\]@\[\033[34m\]\h\[\033[0m\] \[\033[34m\]\w\[\033[0m\]\$ '
+    fi
+fi
+
+export EDITOR='/bin/vim'
+
+for i in /etc/profile.d/*.sh ; do
+	if [ -r "$i" ]; then
+		. $i
+	fi
+done
+unset i
+
+echo -e "${YELLOW_START}welcome to wheatfox dev linux environment!${YELLOW_END}"

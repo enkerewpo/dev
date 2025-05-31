@@ -33,7 +33,7 @@ fi
 qemu-system-loongarch64 -m 16G -cpu la464 \
     -machine virt \
     -smp 1 -bios firmware/QEMU_EFI.fd -kernel $KERNEL_PATH \
-    -append "earlyprintk=serial console=ttyS0,115200 root=/dev/vda rw init=/bin/busybox init" \
+    -append "earlyprintk=serial console=ttyS0,115200 root=/dev/vda rw" \
     -drive file=$ROOTFS_PATH,format=raw,if=none,id=rootfs \
     -device virtio-blk-pci,drive=rootfs,bus=pcie.0,addr=0x5 \
     -serial mon:stdio \

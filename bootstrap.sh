@@ -222,7 +222,8 @@ build_nix_rootfs() {
     fi
 
     # resize the rootfs.ext4 to 1G using sudo resize2fs
-    sudo e2fsck -f "${NIX_ROOTFS_DIR}/rootfs.ext4"
+    # run e2fsck in auto fix mode and ignore the return value
+    sudo e2fsck -p -f "${NIX_ROOTFS_DIR}/rootfs.ext4" || true
     sudo resize2fs "${NIX_ROOTFS_DIR}/rootfs.ext4" 2G
 
     # mount the rootfs.ext4 to the mount directory
@@ -231,7 +232,7 @@ build_nix_rootfs() {
     # copy the contents of the rootfs.ext4.link to the mount directory
     sudo cp -r "${NIX_ROOTFS_DIR}/rootfs.ext4.link"/* "${NIX_ROOTFS_DIR}/mount"
     
-    # sudo cp -r overlay/* "${NIX_ROOTFS_DIR}/mount"
+    sudo cp -r overlay/* "${NIX_ROOTFS_DIR}/mount"
 
     # copy modules
     sudo mkdir -p "${NIX_ROOTFS_DIR}/mount/lib/modules"

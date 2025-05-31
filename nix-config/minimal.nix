@@ -31,14 +31,15 @@ in pkgs.buildEnv {
     busybox
     coreutils
     bash
+    zsh
     curl
     findutils
     gnugrep
     gnused
+    sudo
     gnutar
     gzip
     binutils
-    fastfetch
     glibc
     pciutils
     vim
@@ -47,7 +48,8 @@ in pkgs.buildEnv {
     strace
     file
     # qemu_loongarch
-    # rt-tests
+    rt-tests
+    tmux
     util-linux
     htop
     ncurses
@@ -62,6 +64,9 @@ in pkgs.buildEnv {
     # add ebpf stuff
     bpftools
     libbpf
+    # add standard ps command
+    procps
+    hwinfo
   ];
 
   extraOutputsToInstall = [

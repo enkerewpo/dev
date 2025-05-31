@@ -1,0 +1,19 @@
+#include <linux/bpf.h>
+#include <linux/ptrace.h>
+#include <linux/version.h>
+
+struct {
+    __uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
+    __uint(key_size, sizeof(int));
+    __uint(value_size, sizeof(int));
+} events SEC(".maps");
+
+SEC("tracepoint/syscalls/sys_enter_execve")
+int trace_execve_enter(struct trace_event_raw_sys_enter *ctx)
+{
+    char fmt[] = "execve called\n";
+    bpf_trace_printk(fmt, sizeof(fmt));
+    return 0;
+}
+
+char LICENSE[] SEC("license") = "GPL"; 
