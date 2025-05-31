@@ -378,7 +378,8 @@ run_menuconfig() {
 
 save_defconfig() {
     log_info "Saving defconfig"
-    cp "${LINUX_SRC_DIR}/.config" "${LINUX_SRC_DIR}/arch/${ARCH}/configs/${TARGET_DEFCONFIG}"
+    cp -v "${LINUX_SRC_DIR}/.config" "${LINUX_SRC_DIR}/arch/${ARCH}/configs/${TARGET_DEFCONFIG}"
+    cp -v "${LINUX_SRC_DIR}/.config" "configs/${TARGET_DEFCONFIG}"
 }
 
 build_kernel() {

@@ -61,10 +61,8 @@ in pkgs.buildEnv {
     dhcpcd
     iproute2
     iputils
-    # add ebpf stuff
     bpftools
     libbpf
-    # add standard ps command
     procps
     hwinfo
   ];
