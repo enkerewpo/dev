@@ -1,0 +1,27 @@
+LINUX DEV ENVIRONMENT
+
+wheatfox, wheatfox17@icloud.com
+
+INSTRUCTIONS
+============
+
+use bootstrap.sh to:
+
+1. build linux kernel
+2. update linux kernel config
+3. open linux kernel menuconfig
+4. build nix-based rootfs ext4 image
+
+use run.sh to start a qemu boot the built kernel + rootfs.
+
+NOTES
+=====
+
+to enable CONFIG_RUST in menuconfig, MODVERSION should be disabled.
+
+
+
+
+
+
+to enable CONFIG_RUST in menuconfig, MODVERSION should be disabled.
