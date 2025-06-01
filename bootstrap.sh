@@ -18,6 +18,7 @@ export NIXPKGS_ALLOW_UNSUPPORTED_SYSTEM=1
 readonly ARCH="loongarch"
 readonly CROSS_COMPILE="loongarch64-unknown-linux-gnu-"
 readonly TARGET_DEFCONFIG="wheatfox_defconfig"
+# readonly TARGET_DEFCONFIG="loongson3_defconfig"
 readonly LOG_DIR="build_logs"
 
 # Dynamic configuration (these should not be readonly)
@@ -402,7 +403,9 @@ build_kernel() {
 
     # check .config to have CONFIG_RUST=y
     if ! grep -q "CONFIG_RUST=y" "${LINUX_SRC_DIR}/.config"; then
-        die "CONFIG_RUST is not enabled in .config"
+        log_warn "CONFIG_RUST is not enabled in .config, adding it to .config"
+        # add CONFIG_RUST=y to .config
+        echo "CONFIG_RUST=y" >> "${LINUX_SRC_DIR}/.config"
     fi
 
     if ! make $(get_make_args) -j"${NUM_JOBS}" 2>&1 | tee "${build_log}"; then
