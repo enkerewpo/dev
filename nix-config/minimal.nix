@@ -70,6 +70,7 @@ in pkgs.buildEnv {
     gnumake
     binutils
     llvm
+    bpftools
   ];
 
   extraOutputsToInstall = [
@@ -85,6 +86,8 @@ in pkgs.buildEnv {
     "usr/lib"
     "usr/share"
     "usr/share/man"
+    "usr/lib"
+    "usr/include"
   ];
 
   pathsToLink = [
@@ -100,6 +103,8 @@ in pkgs.buildEnv {
     "/usr/lib"
     "/usr/share"
     "/usr/share/man"
+    "/usr/lib"
+    "/usr/include"
   ];
 
   postBuild = ''

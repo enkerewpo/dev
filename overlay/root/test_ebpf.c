@@ -22,9 +22,17 @@ int main(int argc, char **argv)
     libbpf_set_print(libbpf_print_fn);
 
     /* Open BPF object */
-    obj = bpf_object__open_and_load("test_ebpf.bpf");
+    obj = bpf_object__open_file("test1.o", NULL);
     if (libbpf_get_error(obj)) {
-        fprintf(stderr, "Failed to open and load BPF object\n");
+        fprintf(stderr, "Failed to open BPF object\n");
+        return 1;
+    }
+
+    /* Load BPF object into kernel */
+    err = bpf_object__load(obj);
+    if (err) {
+        fprintf(stderr, "Failed to load BPF object\n");
+        bpf_object__close(obj);
         return 1;
     }
 

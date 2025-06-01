@@ -1,0 +1,1 @@
+bpftool prog load test1.o /sys/fs/bpf/kprobe autoattach
