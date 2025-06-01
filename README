@@ -18,10 +18,3 @@ NOTES
 =====
 
 to enable CONFIG_RUST in menuconfig, MODVERSION should be disabled.
-
-
-
-
-
-
-to enable CONFIG_RUST in menuconfig, MODVERSION should be disabled.
