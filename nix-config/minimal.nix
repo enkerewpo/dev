@@ -65,6 +65,11 @@ in pkgs.buildEnv {
     libbpf
     procps
     hwinfo
+    clang
+    lld
+    gnumake
+    binutils
+    llvm
   ];
 
   extraOutputsToInstall = [

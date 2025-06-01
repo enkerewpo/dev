@@ -222,10 +222,9 @@ build_nix_rootfs() {
         sudo umount "${NIX_ROOTFS_DIR}/mount"
     fi
 
-    # resize the rootfs.ext4 to 1G using sudo resize2fs
     # run e2fsck in auto fix mode and ignore the return value
     sudo e2fsck -p -f "${NIX_ROOTFS_DIR}/rootfs.ext4" || true
-    sudo resize2fs "${NIX_ROOTFS_DIR}/rootfs.ext4" 2G
+    sudo resize2fs "${NIX_ROOTFS_DIR}/rootfs.ext4" 8G
 
     # mount the rootfs.ext4 to the mount directory
     sudo mount "${NIX_ROOTFS_DIR}/rootfs.ext4" "${NIX_ROOTFS_DIR}/mount"
