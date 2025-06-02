@@ -4,7 +4,7 @@
 #
 # Linux Kernel Development Build Script
 # This script manages the build process for Linux kernel with Rust support,
-# specifically targeting the Loongarch64 architecture.
+# supporting both Loongarch64 and AArch64 architectures.
 
 set -euo pipefail
 
@@ -14,11 +14,43 @@ export NIXPKGS_ALLOW_UNSUPPORTED_SYSTEM=1
 # Configuration
 ###################
 
+# Architecture configuration
+ARCH_CONFIGS=(
+    "loongarch:loongarch64-unknown-linux-gnu-:wheatfox_defconfig:loongarch64-linux:loongarch.nix"
+    "arm64:aarch64-unknown-linux-gnu-:defconfig:aarch64-linux:aarch64.nix"
+)
+
+# Default architecture (can be overridden by ARCH environment variable)
+DEFAULT_ARCH="arm64"
+
 # Build configuration (these can be readonly)
-readonly ARCH="loongarch"
-readonly CROSS_COMPILE="loongarch64-unknown-linux-gnu-"
-readonly TARGET_DEFCONFIG="wheatfox_defconfig"
-# readonly TARGET_DEFCONFIG="loongson3_defconfig"
+ARCH=${ARCH:-${DEFAULT_ARCH}}
+CROSS_COMPILE=""
+TARGET_DEFCONFIG=""
+NIX_SYSTEM=""
+NIX_FILE=""
+
+# Set architecture-specific variables
+for config in "${ARCH_CONFIGS[@]}"; do
+    IFS=':' read -r arch_name cross_compile defconfig nix_system nix_file <<< "${config}"
+    if [[ "${ARCH}" == "${arch_name}" ]]; then
+        CROSS_COMPILE="${cross_compile}"
+        TARGET_DEFCONFIG="${defconfig}"
+        NIX_SYSTEM="${nix_system}"
+        NIX_FILE="${nix_file}"
+        break
+    fi
+done
+
+if [[ -z "${CROSS_COMPILE}" ]]; then
+    die "Unsupported architecture: ${ARCH}. Supported architectures: $(printf '%s ' "${ARCH_CONFIGS[@]}" | cut -d: -f1)"
+fi
+
+readonly ARCH
+readonly CROSS_COMPILE
+readonly TARGET_DEFCONFIG
+readonly NIX_SYSTEM
+readonly NIX_FILE
 readonly LOG_DIR="build_logs"
 
 # Dynamic configuration (these should not be readonly)
@@ -38,7 +70,7 @@ LLD=""
 LLVM_OBJCOPY=""
 LLVM_READELF=""
 LLVM_OBJDUMP=""
-GNU_PREFIX="loongarch64-unknown-linux-gnu-"
+GNU_PREFIX="${CROSS_COMPILE}"
 GNU_GCC=""
 GNU_OBJCOPY=""
 GNU_READELF=""
@@ -57,7 +89,6 @@ RUST_LIB_SRC="$(${RUSTC} --print sysroot)/lib/rustlib/src/rust/library"
 # Nix configuration
 NIX_ROOTFS_DIR="nix-rootfs"
 NIX_CONFIG_DIR="nix-config"
-NIX_SYSTEM="loongarch64-linux"
 
 ###################
 # Logging Functions
@@ -193,61 +224,63 @@ setup_nix_rootfs() {
 
 build_nix_rootfs() {
     check_nix
-    setup_nix_rootfs
+    # setup_nix_rootfs
 
-    log_info "Building Nix rootfs for ${NIX_SYSTEM}"
+    # log_info "Building Nix rootfs for ${NIX_SYSTEM} using ${NIX_FILE}"
 
-    # Create output directory
-    mkdir -p "${NIX_ROOTFS_DIR}"
+    # # Create output directory
+    # mkdir -p "${NIX_ROOTFS_DIR}"
 
-    export NIXPKGS_ALLOW_UNSUPPORTED_SYSTEM=1
+    # export NIXPKGS_ALLOW_UNSUPPORTED_SYSTEM=1
 
-    NIX_BUILD_CMD1="nix-build --impure --show-trace --no-sandbox --log-format bar -A image --out-link ${NIX_ROOTFS_DIR}/rootfs.ext4"
-    NIX_BUILD_CMD2="nix-build --impure --show-trace --no-sandbox --log-format bar -A rootfs --out-link ${NIX_ROOTFS_DIR}/rootfs.ext4.link"
+    # NIX_BUILD_CMD1="nix-build --impure --show-trace --no-sandbox --log-format bar -A image --out-link ${NIX_ROOTFS_DIR}/rootfs.ext4 ${NIX_FILE}"
+    # NIX_BUILD_CMD2="nix-build --impure --show-trace --no-sandbox --log-format bar -A rootfs --out-link ${NIX_ROOTFS_DIR}/rootfs.ext4.link ${NIX_FILE}"
 
-    # create a list of commands to run
-    NIX_BUILD_CMDS=("${NIX_BUILD_CMD1}" "${NIX_BUILD_CMD2}")
+    # # create a list of commands to run
+    # NIX_BUILD_CMDS=("${NIX_BUILD_CMD1}" "${NIX_BUILD_CMD2}")
 
-    for cmd in "${NIX_BUILD_CMDS[@]}"; do
-        if ! eval "${cmd}"; then
-            die "Failed to build Nix rootfs, failed command: ${cmd}"
-        fi
-    done
-    if [[ ! -d "${NIX_ROOTFS_DIR}/mount" ]]; then
-        mkdir -p "${NIX_ROOTFS_DIR}/mount"
-    fi
+    # for cmd in "${NIX_BUILD_CMDS[@]}"; do
+    #     if ! eval "${cmd}"; then
+    #         die "Failed to build Nix rootfs, failed command: ${cmd}"
+    #     fi
+    # done
+    # if [[ ! -d "${NIX_ROOTFS_DIR}/mount" ]]; then
+    #     mkdir -p "${NIX_ROOTFS_DIR}/mount"
+    # fi
 
-    # if already mounted, unmount it
-    if mount | grep -q "${NIX_ROOTFS_DIR}/mount"; then
-        sudo umount "${NIX_ROOTFS_DIR}/mount"
-    fi
+    # # if already mounted, unmount it
+    # if mount | grep -q "${NIX_ROOTFS_DIR}/mount"; then
+    #     sudo umount "${NIX_ROOTFS_DIR}/mount"
+    # fi
 
-    # run e2fsck in auto fix mode and ignore the return value
-    sudo e2fsck -p -f "${NIX_ROOTFS_DIR}/rootfs.ext4" || true
-    sudo resize2fs "${NIX_ROOTFS_DIR}/rootfs.ext4" 8G || true
+    # # run e2fsck in auto fix mode and ignore the return value
+    # sudo e2fsck -p -f "${NIX_ROOTFS_DIR}/rootfs.ext4" || true
+    # sudo resize2fs "${NIX_ROOTFS_DIR}/rootfs.ext4" 8G || true
 
-    # mount the rootfs.ext4 to the mount directory
-    sudo mount "${NIX_ROOTFS_DIR}/rootfs.ext4" "${NIX_ROOTFS_DIR}/mount"
+    # # mount the rootfs.ext4 to the mount directory
+    # sudo mount "${NIX_ROOTFS_DIR}/rootfs.ext4" "${NIX_ROOTFS_DIR}/mount"
 
-    # copy the contents of the rootfs.ext4.link to the mount directory
-    sudo cp -r "${NIX_ROOTFS_DIR}/rootfs.ext4.link"/* "${NIX_ROOTFS_DIR}/mount"
+    # # copy the contents of the rootfs.ext4.link to the mount directory
+    # sudo cp -r "${NIX_ROOTFS_DIR}/rootfs.ext4.link"/* "${NIX_ROOTFS_DIR}/mount"
     
-    sudo cp -r overlay/* "${NIX_ROOTFS_DIR}/mount"
+    # sudo cp -r overlay/* "${NIX_ROOTFS_DIR}/mount"
 
-    # copy modules
-    sudo mkdir -p "${NIX_ROOTFS_DIR}/mount/lib/modules"
-    sudo cp -r "${LINUX_SRC_DIR}/../modules-install"/lib/modules/* "${NIX_ROOTFS_DIR}/mount/lib/modules"
+    # # copy modules
+    # sudo mkdir -p "${NIX_ROOTFS_DIR}/mount/lib/modules"
+    # sudo cp -r "${LINUX_SRC_DIR}/../modules-install"/lib/modules/* "${NIX_ROOTFS_DIR}/mount/lib/modules"
 
-    ls -la "${NIX_ROOTFS_DIR}/mount"
+    # ls -la "${NIX_ROOTFS_DIR}/mount"
 
-    # copy ../qemu/** into ${NIX_ROOTFS_DIR}/mount/opt/qemu-src
-    # create the directory if it doesn't exist
-    # sudo mkdir -p "${NIX_ROOTFS_DIR}/mount/opt/qemu-src"
-    # sudo cp -r ../qemu "${NIX_ROOTFS_DIR}/mount/opt/qemu-src"
+    # # copy ../qemu/** into ${NIX_ROOTFS_DIR}/mount/opt/qemu-src
+    # # create the directory if it doesn't exist
+    # # sudo mkdir -p "${NIX_ROOTFS_DIR}/mount/opt/qemu-src"
+    # # sudo cp -r ../qemu "${NIX_ROOTFS_DIR}/mount/opt/qemu-src"
 
-    sudo umount "${NIX_ROOTFS_DIR}/mount"
+    # sudo umount "${NIX_ROOTFS_DIR}/mount"
 
-    log_info "Nix rootfs built successfully in ${NIX_ROOTFS_DIR}/mount"
+    # log_info "Nix rootfs built successfully in ${NIX_ROOTFS_DIR}/mount"
+
+    ./nix_build.sh
 }
 
 ###################
@@ -465,7 +498,7 @@ build_rootfs() {
 }
 
 run_rust_kunit_tests() {
-    log_info "Running Rust KUnit (doctest) tests for loongarch"
+    log_info "Running Rust KUnit (doctest) tests for ${ARCH}"
     local kunit_py="${LINUX_SRC_DIR}/tools/testing/kunit/kunit.py"
     if [[ ! -f "$kunit_py" ]]; then
         die "kunit.py not found at $kunit_py"
@@ -478,7 +511,7 @@ run_rust_kunit_tests() {
     (cd "${LINUX_SRC_DIR}" && \
         python3 tools/testing/kunit/kunit.py run \
             --make_options "LLVM=1" \
-            --arch=loongarch \
+            --arch="${ARCH}" \
             --kconfig_add CONFIG_RUST=y \
             --kconfig_add CONFIG_KUNIT=y \
             --kconfig_add CONFIG_RUST_KERNEL_DOCTESTS=y)
@@ -510,13 +543,13 @@ show_help() {
     echo -e "    ${BOLD}${GREEN}rootfs${RESET}      Build the root filesystem using Nix"
     echo -e "    ${BOLD}${GREEN}status${RESET}      Show build status and configuration"
     echo -e "    ${BOLD}${GREEN}check${RESET}       Check build dependencies"
-    # echo -e "    ${BOLD}${GREEN}install-bindgen${RESET}  Install bindgen-cli tool"
     echo -e "    ${BOLD}${GREEN}rust-test${RESET}   Run Rust tests"
-    echo -e "    ${BOLD}${GREEN}rust-kunit-test${RESET}   Run Rust KUnit (doctest) tests for loongarch"
+    echo -e "    ${BOLD}${GREEN}rust-kunit-test${RESET}   Run Rust KUnit (doctest) tests"
     echo -e "    ${BOLD}${GREEN}rust-docs${RESET}   Generate Rust documentation"
     echo
 
     echo -e "${BOLD}${YELLOW}Build Options:${RESET}"
+    echo -e "    ${BOLD}${CYAN}ARCH=${RESET}loongarch|arm64  Select target architecture (default: arm64)"
     echo -e "    ${BOLD}${CYAN}USE_LLVM=${RESET}0|1     Enable/disable LLVM toolchain (default: 1)"
     echo -e "    ${BOLD}${CYAN}LLVM_HOME=${RESET}<path>  Set custom LLVM tools path"
     echo
@@ -524,6 +557,7 @@ show_help() {
     echo -e "${BOLD}${YELLOW}Examples:${RESET}"
     echo "    $0 def                    # Configure kernel"
     echo "    $0 kernel                 # Build kernel with LLVM"
+    echo "    ARCH=arm64 $0 kernel      # Build kernel for ARM64"
     echo "    USE_LLVM=0 $0 kernel      # Build kernel with GNU toolchain"
     echo "    LLVM_HOME=/opt/llvm $0    # Use custom LLVM path"
     echo

@@ -1,32 +1,12 @@
 { pkgs }:
 
 let
-  qemu_loongarch = (pkgs.qemu_kvm.override {
-    hostCpuOnly = true;
-    alsaSupport = false;
-    pulseSupport = false;
-    sdlSupport = false;
-    jackSupport = false;
-    gtkSupport = false;
-    vncSupport = false;
-    smartcardSupport = false;
-    spiceSupport = false;
-    ncursesSupport = false;
-    libiscsiSupport = false;
-    tpmSupport = false;
-    numaSupport = false;
-    seccompSupport = false;
-    guestAgentSupport = false;
-    minimal = true;
-  }).overrideAttrs (super: {
-    buildInputs = super.buildInputs ++ [ pkgs.git pkgs.dtc pkgs.pkg-config ];
-  });
   util-linux = pkgs.util-linux.overrideAttrs (super: {
     buildInputs = super.buildInputs ++ [ pkgs.pkg-config ];
   });
 
 in pkgs.buildEnv {
-  name = "loongarch64-rootfs";
+  name = "rootfs";
   paths = with pkgs; [
     busybox
     coreutils
@@ -43,21 +23,14 @@ in pkgs.buildEnv {
     glibc
     pciutils
     vim
-    # systemd
     perf-tools
     strace
     file
-    # qemu_loongarch
     rt-tests
     tmux
     util-linux
     htop
     ncurses
-    # nix
-    # glib
-    # python3
-    # python3.pkgs.setuptools
-    # python3.pkgs.wheel
     dhcpcd
     iproute2
     iputils
