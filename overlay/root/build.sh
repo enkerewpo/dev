@@ -1,1 +1,0 @@
-clang test_ebpf.c -o test_ebpf -Iinclude -lbpf

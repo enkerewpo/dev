@@ -52,6 +52,7 @@ readonly TARGET_DEFCONFIG
 readonly NIX_SYSTEM
 readonly NIX_FILE
 readonly LOG_DIR="build_logs"
+readonly BUILD_DIR="build-${ARCH}"  # New build directory for output
 
 # Dynamic configuration (these should not be readonly)
 USE_LLVM=${USE_LLVM:-1} # Can be overridden by environment variable, default is 1
@@ -117,6 +118,7 @@ die() {
 
 setup_workspace() {
     mkdir -p "${LOG_DIR}"
+    mkdir -p "${BUILD_DIR}"
 
     # Load chosen kernel version
     if [[ ! -f .chosen ]]; then
@@ -127,7 +129,7 @@ setup_workspace() {
     CHOSEN=$(cat .chosen)
     LINUX_SRC_DIR=$(realpath "linux-${CHOSEN}")
     WORKDIR=$(dirname "${LINUX_SRC_DIR}")
-    FLAG="${WORKDIR}/.flag"
+    FLAG="${BUILD_DIR}/.flag"
 
     if [[ ! -d "linux-${CHOSEN}" ]]; then
         print_available_versions
@@ -135,6 +137,7 @@ setup_workspace() {
     fi
 
     log_info "Using Linux source: linux-${CHOSEN}"
+    log_info "Build output directory: ${BUILD_DIR}"
 }
 
 print_available_versions() {
@@ -374,7 +377,7 @@ setup_toolchain() {
 
 # Get make arguments based on toolchain
 get_make_args() {
-    local args="-C ${LINUX_SRC_DIR} ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE}"
+    local args="-C ${LINUX_SRC_DIR} O=${BUILD_DIR} ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE}"
 
     if [[ ${USE_LLVM} -eq 1 ]]; then
         args+=" LLVM=1"
@@ -395,12 +398,20 @@ get_make_args() {
 
 run_defconfig() {
     log_info "Running defconfig, using ${TARGET_DEFCONFIG}"
+    
+    # First clean the source tree
+    log_info "Cleaning source tree"
+    make -C "${LINUX_SRC_DIR}" ARCH="${ARCH}" mrproper
+    
+    # Then run defconfig
     make $(get_make_args) "${TARGET_DEFCONFIG}"
 }
 
 clean_build() {
     log_info "Cleaning the build"
-    make $(get_make_args) clean
+    # Clean both the build directory and source tree
+    make -C "${LINUX_SRC_DIR}" ARCH="${ARCH}" mrproper
+    rm -rf "${BUILD_DIR}"
     rm -f "${FLAG}"
 }
 
@@ -411,33 +422,35 @@ run_menuconfig() {
 
 save_defconfig() {
     log_info "Saving defconfig"
-    cp -v "${LINUX_SRC_DIR}/.config" "${LINUX_SRC_DIR}/arch/${ARCH}/configs/${TARGET_DEFCONFIG}"
-    cp -v "${LINUX_SRC_DIR}/.config" "configs/${TARGET_DEFCONFIG}"
+    if [[ ! -f "${BUILD_DIR}/.config" ]]; then
+        die "No .config file found in ${BUILD_DIR}"
+    fi
+    cp -v "${BUILD_DIR}/.config" "${LINUX_SRC_DIR}/arch/${ARCH}/configs/${TARGET_DEFCONFIG}"
+    cp -v "${BUILD_DIR}/.config" "configs/${TARGET_DEFCONFIG}"
 }
 
 build_kernel() {
-
     log_info "Building kernel with:"
     log_info "  USE_LLVM=${USE_LLVM}"
     log_info "  Jobs=${NUM_JOBS}"
     log_info "  Rust support enabled"
+    log_info "  Build directory: ${BUILD_DIR}"
 
-    rm -rf "${LINUX_SRC_DIR}/../modules-install"
+    rm -rf "${BUILD_DIR}/modules-install"
 
     # Check Rust availability
     log_info "Checking Rust availability for kernel build"
 
     cmd="make $(get_make_args) rustavailable"
-    # echo "${cmd}"
     eval "${cmd}"
 
     local build_log="${LOG_DIR}/build_$(date +%Y%m%d_%H%M%S).log"
 
     # check .config to have CONFIG_RUST=y
-    if ! grep -q "CONFIG_RUST=y" "${LINUX_SRC_DIR}/.config"; then
+    if ! grep -q "CONFIG_RUST=y" "${BUILD_DIR}/.config"; then
         log_warn "CONFIG_RUST is not enabled in .config, adding it to .config"
         # add CONFIG_RUST=y to .config
-        echo "CONFIG_RUST=y" >> "${LINUX_SRC_DIR}/.config"
+        echo "CONFIG_RUST=y" >> "${BUILD_DIR}/.config"
     fi
 
     if ! make $(get_make_args) -j"${NUM_JOBS}" 2>&1 | tee "${build_log}"; then
@@ -447,19 +460,15 @@ build_kernel() {
 
     log_info "Generating debug information"
     if [[ ${USE_LLVM} -eq 1 ]]; then
-        "${LLVM_READELF}" -a "${LINUX_SRC_DIR}/vmlinux" >"${LINUX_SRC_DIR}/vmlinux.readelf.txt"
-        # "${LLVM_OBJDUMP}" -d "${LINUX_SRC_DIR}/vmlinux" >"${LINUX_SRC_DIR}/vmlinux.asm"
+        "${LLVM_READELF}" -a "${BUILD_DIR}/vmlinux" >"${BUILD_DIR}/vmlinux.readelf.txt"
     else
-        "${GNU_READELF}" -a "${LINUX_SRC_DIR}/vmlinux" >"${LINUX_SRC_DIR}/vmlinux.readelf.txt"
-        # "${GNU_OBJDUMP}" -d "${LINUX_SRC_DIR}/vmlinux" >"${LINUX_SRC_DIR}/vmlinux.asm"
+        "${GNU_READELF}" -a "${BUILD_DIR}/vmlinux" >"${BUILD_DIR}/vmlinux.readelf.txt"
     fi
 
     log_info "Generating compile_commands.json"
     cd "${LINUX_SRC_DIR}"
     python3 scripts/clang-tools/gen_compile_commands.py
 
-    # Remove the rust-analyzer generation step since it's no longer supported
-    # log_info "Generating rust-project.json for rust-analyzer"
     log_info "Generating rust-project.json for rust-analyzer"
     # Set required environment variables
     export RUSTC
@@ -470,12 +479,10 @@ build_kernel() {
     echo "${cmd}"
     eval "${cmd}"
 
-    # install modules to ../modules-install
-    make $(get_make_args) modules_install INSTALL_MOD_PATH="${LINUX_SRC_DIR}/../modules-install"
+    # install modules to build directory
+    make $(get_make_args) modules_install INSTALL_MOD_PATH="${BUILD_DIR}/modules-install"
     log_info "Build completed successfully"
 }
-
-# Remove the separate check_rust_available and generate_rust_analyzer functions
 
 install_bindgen() {
     log_info "Installing bindgen-cli"
