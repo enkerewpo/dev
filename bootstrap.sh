@@ -52,7 +52,7 @@ readonly TARGET_DEFCONFIG
 readonly NIX_SYSTEM
 readonly NIX_FILE
 readonly LOG_DIR="build_logs"
-readonly BUILD_DIR="build-${ARCH}"  # New build directory for output
+readonly BUILD_DIR="build"  # New build directory for output
 
 # Dynamic configuration (these should not be readonly)
 USE_LLVM=${USE_LLVM:-1} # Can be overridden by environment variable, default is 1
@@ -377,7 +377,7 @@ setup_toolchain() {
 
 # Get make arguments based on toolchain
 get_make_args() {
-    local args="-C ${LINUX_SRC_DIR} ARCH=$(to_linux_arch "${ARCH}") CROSS_COMPILE=${CROSS_COMPILE}"
+    local args="-C ${LINUX_SRC_DIR} O=../build ARCH=$(to_linux_arch "${ARCH}") CROSS_COMPILE=${CROSS_COMPILE}"
 
     if [[ ${USE_LLVM} -eq 1 ]]; then
         args+=" LLVM=1"
