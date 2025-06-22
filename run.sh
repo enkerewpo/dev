@@ -2,21 +2,30 @@
 
 # Architecture configuration
 ARCH_CONFIGS=(
-    "loongarch:loongarch64/boot/vmlinux.efi:la464:QEMU_EFI.fd:uefi"
-    "arm64:arm64/boot/Image:max:u-boot-aarch64.bin:uboot"
+    "loongarch64:build-loongarch/loongarch/boot/vmlinux.efi:la464:firmware/QEMU_EFI.fd:uefi"
+    "aarch64:build-arm64/arm64/boot/Image:max:firmware/u-boot-aarch64.bin:uboot"
 )
 
-# Default architecture (can be overridden by ARCH environment variable)
-DEFAULT_ARCH="arm64"
-ARCH=${ARCH:-${DEFAULT_ARCH}}
+ARCH=$1
+if [ -z "$ARCH" ]; then
+    echo "Usage: $0 <arch>"
+    echo "Supported architectures: $(printf '%s ' "${ARCH_CONFIGS[@]}" | cut -d: -f1)"
+    exit 1
+fi
 
 # Set architecture-specific variables
 CPU_TYPE=""
+KERNEL_PATH=""
+FIRMWARE_FILE=""
+BOOT_TYPE=""
 
 for config in "${ARCH_CONFIGS[@]}"; do
     IFS=':' read -r arch_name kernel_path cpu_type firmware_file boot_type <<< "${config}"
     if [[ "${ARCH}" == "${arch_name}" ]]; then
         CPU_TYPE="${cpu_type}"
+        KERNEL_PATH="${kernel_path}"
+        FIRMWARE_FILE="${firmware_file}"
+        BOOT_TYPE="${boot_type}"
         break
     fi
 done
@@ -56,7 +65,8 @@ QEMU_OPTS=(
     "-netdev" "user,id=net0"
     "-nographic"
     "-append" "console=ttyAMA0 root=/dev/vda2 rw debug"
-    "-kernel" "linux-git/arch/arm64/boot/Image"
+    "-bios" "${FIRMWARE_FILE}"
+    "-kernel" "${KERNEL_PATH}"
 )
 
 if [[ "${ARCH}" == "arm64" ]]; then
