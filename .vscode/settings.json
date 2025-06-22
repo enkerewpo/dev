@@ -2,6 +2,7 @@
     "git.ignoreLimitWarning": true,
     "rust-analyzer.linkedProjects": [
         "linux-git/rust-project.json",
+        "tools/ebpf-wrapper/Cargo.toml"
     ],
     "rust-analyzer.inlayHints.parameterHints.enable": true,
     "nix.enableLanguageServer": true,

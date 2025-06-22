@@ -16,12 +16,12 @@ export NIXPKGS_ALLOW_UNSUPPORTED_SYSTEM=1
 
 # Architecture configuration
 ARCH_CONFIGS=(
-    "loongarch:loongarch64-unknown-linux-gnu-:wheatfox_defconfig:loongarch64-linux:loongarch.nix"
-    "arm64:aarch64-unknown-linux-gnu-:defconfig:aarch64-linux:aarch64.nix"
+    "loongarch64:loongarch64-unknown-linux-gnu-:loongson3_defconfig:loongarch64-linux:loongarch.nix"
+    "aarch64:aarch64-unknown-linux-gnu-:defconfig:aarch64-linux:aarch64.nix"
 )
 
 # Default architecture (can be overridden by ARCH environment variable)
-DEFAULT_ARCH="arm64"
+DEFAULT_ARCH="loongarch64"
 
 # Build configuration (these can be readonly)
 ARCH=${ARCH:-${DEFAULT_ARCH}}
@@ -283,7 +283,7 @@ build_nix_rootfs() {
 
     # log_info "Nix rootfs built successfully in ${NIX_ROOTFS_DIR}/mount"
 
-    ./nix_build.sh
+    ./nix_build.sh "${ARCH}"
 }
 
 ###################
@@ -377,7 +377,7 @@ setup_toolchain() {
 
 # Get make arguments based on toolchain
 get_make_args() {
-    local args="-C ${LINUX_SRC_DIR} O=${BUILD_DIR} ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE}"
+    local args="-C ${LINUX_SRC_DIR} ARCH=$(to_linux_arch "${ARCH}") CROSS_COMPILE=${CROSS_COMPILE}"
 
     if [[ ${USE_LLVM} -eq 1 ]]; then
         args+=" LLVM=1"
@@ -396,12 +396,24 @@ get_make_args() {
     echo "${args}"
 }
 
+# Convert architecture to Linux kernel architecture convention
+to_linux_arch() {
+    local arch=$1
+    if [[ "${arch}" == "loongarch64" ]]; then
+        echo "loongarch"
+    elif [[ "${arch}" == "aarch64" ]]; then
+        echo "arm64"
+    else
+        die "Unsupported architecture: ${arch}"
+    fi
+}
+
 run_defconfig() {
     log_info "Running defconfig, using ${TARGET_DEFCONFIG}"
     
     # First clean the source tree
     log_info "Cleaning source tree"
-    make -C "${LINUX_SRC_DIR}" ARCH="${ARCH}" mrproper
+    make -C "${LINUX_SRC_DIR}" ARCH="$(to_linux_arch "${ARCH}")" mrproper
     
     # Then run defconfig
     make $(get_make_args) "${TARGET_DEFCONFIG}"
@@ -410,7 +422,7 @@ run_defconfig() {
 clean_build() {
     log_info "Cleaning the build"
     # Clean both the build directory and source tree
-    make -C "${LINUX_SRC_DIR}" ARCH="${ARCH}" mrproper
+    make -C "${LINUX_SRC_DIR}" ARCH="$(to_linux_arch "${ARCH}")" mrproper
     rm -rf "${BUILD_DIR}"
     rm -f "${FLAG}"
 }
@@ -541,22 +553,22 @@ show_help() {
     echo
 
     echo -e "${BOLD}${YELLOW}Commands:${RESET}"
-    echo -e "    ${BOLD}${GREEN}help${RESET}        Show this help message"
-    echo -e "    ${BOLD}${GREEN}def${RESET}         Run defconfig and initialize build"
-    echo -e "    ${BOLD}${GREEN}clean${RESET}       Clean the build artifacts"
-    echo -e "    ${BOLD}${GREEN}menu${RESET}        Run kernel menuconfig"
-    echo -e "    ${BOLD}${GREEN}save${RESET}        Save current config as defconfig"
-    echo -e "    ${BOLD}${GREEN}kernel${RESET}      Build the kernel (requires def first)"
-    echo -e "    ${BOLD}${GREEN}rootfs${RESET}      Build the root filesystem using Nix"
-    echo -e "    ${BOLD}${GREEN}status${RESET}      Show build status and configuration"
-    echo -e "    ${BOLD}${GREEN}check${RESET}       Check build dependencies"
-    echo -e "    ${BOLD}${GREEN}rust-test${RESET}   Run Rust tests"
+    echo -e "    ${BOLD}${GREEN}help${RESET}              Show this help message"
+    echo -e "    ${BOLD}${GREEN}def${RESET}               Run defconfig and initialize build"
+    echo -e "    ${BOLD}${GREEN}clean${RESET}             Clean the build artifacts"
+    echo -e "    ${BOLD}${GREEN}menu${RESET}              Run kernel menuconfig"
+    echo -e "    ${BOLD}${GREEN}save${RESET}              Save current config as defconfig"
+    echo -e "    ${BOLD}${GREEN}kernel${RESET}            Build the kernel (requires def first)"
+    echo -e "    ${BOLD}${GREEN}rootfs${RESET}            Build the root filesystem using Nix"
+    echo -e "    ${BOLD}${GREEN}status${RESET}            Show build status and configuration"
+    echo -e "    ${BOLD}${GREEN}check${RESET}             Check build dependencies"
+    echo -e "    ${BOLD}${GREEN}rust-test${RESET}         Run Rust tests"
     echo -e "    ${BOLD}${GREEN}rust-kunit-test${RESET}   Run Rust KUnit (doctest) tests"
-    echo -e "    ${BOLD}${GREEN}rust-docs${RESET}   Generate Rust documentation"
+    echo -e "    ${BOLD}${GREEN}rust-docs${RESET}         Generate Rust documentation"
     echo
 
     echo -e "${BOLD}${YELLOW}Build Options:${RESET}"
-    echo -e "    ${BOLD}${CYAN}ARCH=${RESET}loongarch|arm64  Select target architecture (default: arm64)"
+    echo -e "    ${BOLD}${CYAN}ARCH=${RESET}loongarch64|aarch64  Select target architecture (default: loongarch64)"
     echo -e "    ${BOLD}${CYAN}USE_LLVM=${RESET}0|1     Enable/disable LLVM toolchain (default: 1)"
     echo -e "    ${BOLD}${CYAN}LLVM_HOME=${RESET}<path>  Set custom LLVM tools path"
     echo
@@ -564,7 +576,7 @@ show_help() {
     echo -e "${BOLD}${YELLOW}Examples:${RESET}"
     echo "    $0 def                    # Configure kernel"
     echo "    $0 kernel                 # Build kernel with LLVM"
-    echo "    ARCH=arm64 $0 kernel      # Build kernel for ARM64"
+    echo "    ARCH=aarch64 $0 kernel      # Build kernel for ARM64"
     echo "    USE_LLVM=0 $0 kernel      # Build kernel with GNU toolchain"
     echo "    LLVM_HOME=/opt/llvm $0    # Use custom LLVM path"
     echo
