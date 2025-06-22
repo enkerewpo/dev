@@ -2,8 +2,8 @@
 
 # Architecture configuration
 ARCH_CONFIGS=(
-    "loongarch64:build-loongarch/loongarch/boot/vmlinux.efi:la464:firmware/QEMU_EFI.fd:uefi"
-    "aarch64:build-arm64/arm64/boot/Image:max:firmware/u-boot-aarch64.bin:uboot"
+    "loongarch64:build/arch/loongarch/boot/vmlinux.efi:la464:firmware/QEMU_EFI.fd:uefi"
+    "aarch64:build/arch/arm64/boot/Image:max:firmware/u-boot-aarch64.bin:uboot"
 )
 
 ARCH=$1
@@ -35,10 +35,12 @@ if [[ -z "${CPU_TYPE}" ]]; then
     exit 1
 fi
 
-# Check if NixOS SD image exists
-SD_IMAGE_PATH="image/sd-image/nixos-image-sd-card-25.11pre-git-aarch64-linux.img"
+# Check if NixOS SD image exists for the specific architecture
+SD_IMAGE_PATH="image/sd-image/nixos-image-sd-card-25.11pre-git-${ARCH}-linux.img"
 if [ ! -f "$SD_IMAGE_PATH" ]; then
     echo "Error: NixOS SD image not found at $SD_IMAGE_PATH"
+    echo "Available images:"
+    ls -la image/sd-image/ 2>/dev/null || echo "No images found in image/sd-image/"
     exit 1
 fi
 
@@ -64,28 +66,63 @@ QEMU_OPTS=(
     "-device" "virtio-net-pci,netdev=net0,bus=pcie.0,addr=0x6"
     "-netdev" "user,id=net0"
     "-nographic"
-    "-append" "console=ttyAMA0 root=/dev/vda2 rw debug"
-    "-bios" "${FIRMWARE_FILE}"
-    "-kernel" "${KERNEL_PATH}"
 )
 
-if [[ "${ARCH}" == "arm64" ]]; then
+# UEFI boot configuration
+if [[ "${BOOT_TYPE}" == "uefi" ]]; then
+    echo "Configuring UEFI boot..."
+    # Set console device based on architecture
+    if [[ "${ARCH}" == "loongarch64" ]]; then
+        CONSOLE_DEVICE="ttyS0"
+    else
+        CONSOLE_DEVICE="ttyAMA0"
+    fi
+    
+    QEMU_OPTS+=(
+        "-bios" "${FIRMWARE_FILE}"
+        "-kernel" "${KERNEL_PATH}"
+        "-append" "console=${CONSOLE_DEVICE} root=/dev/vda2 rw debug init=/nix/store/d25zk5h758fbif6ab3bbxb19lyi21rpw-busybox-loongarch64-unknown-linux-gnu-1.36.1/bin/sh"
+    )
+else
+    echo "Configuring legacy boot..."
+    # Set console device based on architecture
+    if [[ "${ARCH}" == "loongarch64" ]]; then
+        CONSOLE_DEVICE="ttyS0"
+    else
+        CONSOLE_DEVICE="ttyAMA0"
+    fi
+    
+    QEMU_OPTS+=(
+        "-kernel" "${KERNEL_PATH}"
+        "-append" "console=${CONSOLE_DEVICE} root=/dev/vda2 rw debug"
+    )
+fi
+
+# Architecture-specific machine configuration
+if [[ "${ARCH}" == "aarch64" ]]; then
     QEMU_OPTS+=(
         "-machine" "virt,virtualization=on"
     )
-elif [[ "${ARCH}" == "loongarch" ]]; then
+elif [[ "${ARCH}" == "loongarch64" ]]; then
     QEMU_OPTS+=(
         "-machine" "virt"
     )
 fi
 
+# Set QEMU binary suffix
 QEMU_SUFFIX=""
-if [[ "${ARCH}" == "arm64" ]]; then
+if [[ "${ARCH}" == "aarch64" ]]; then
     QEMU_SUFFIX="aarch64"
-elif [[ "${ARCH}" == "loongarch" ]]; then
+elif [[ "${ARCH}" == "loongarch64" ]]; then
     QEMU_SUFFIX="loongarch64"
 fi
 
 # Run QEMU
-echo "Starting QEMU for ${ARCH} architecture..."
+echo "Starting QEMU for ${ARCH} architecture with ${BOOT_TYPE} boot..."
+echo "Image: ${SD_IMAGE_PATH}"
+echo "Kernel: ${KERNEL_PATH}"
+echo "Firmware: ${FIRMWARE_FILE}"
+echo "Command: qemu-system-${QEMU_SUFFIX} ${QEMU_OPTS[*]}"
+echo ""
+
 qemu-system-${QEMU_SUFFIX} "${QEMU_OPTS[@]}"

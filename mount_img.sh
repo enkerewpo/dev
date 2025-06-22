@@ -1,6 +1,6 @@
 #!/bin/bash
 
-IMG_PATH="image/sd-image/nixos-image-sd-card-25.11pre-git-aarch64-linux.img"
+IMG_PATH="image/sd-image/nixos-image-sd-card-25.11pre-git-loongarch64-linux.img"
 
 if [ ! -f "$IMG_PATH" ]; then
     echo "Error: Image file not found at $IMG_PATH"

@@ -7,6 +7,7 @@ self: super: {
         src = /home/wheatfox/tryredox/linux-dev/linux-git;
         configfile = /home/wheatfox/tryredox/linux-dev/build/.config;
         kernelPatches = [];
+        extraMeta.branch = "6.16";
       }).overrideAttrs (old: {
         passthru = old.passthru // {
           extend = f: super.linuxKernel.packagesFor (super.linuxKernel.manualConfig {
@@ -15,6 +16,7 @@ self: super: {
             src = /home/wheatfox/tryredox/linux-dev/linux-git;
             configfile = /home/wheatfox/tryredox/linux-dev/build/.config;
             kernelPatches = [];
+            extraMeta.branch = "6.16";
           });
         };
       });

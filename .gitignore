@@ -43,3 +43,5 @@ chosen
 test-results
 modules-install
 build*
+image
+root
