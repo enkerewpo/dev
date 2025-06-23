@@ -3,18 +3,18 @@ self: super: {
     packages = super.linuxKernel.packages // {
       linux_local = (super.linuxKernel.manualConfig {
         version = "6.16-git-wheatfox";
-        modDirVersion = "6.16.0-rc2";
-        src = /home/wheatfox/tryredox/linux-dev/linux-git;
-        configfile = /home/wheatfox/tryredox/linux-dev/build/.config;
+        modDirVersion = "6.16.0-rc3"; # 20250623
+        src = ../linux-git;
+        configfile = ../build/.config;
         kernelPatches = [];
         extraMeta.branch = "6.16";
       }).overrideAttrs (old: {
         passthru = old.passthru // {
           extend = f: super.linuxKernel.packagesFor (super.linuxKernel.manualConfig {
             version = "6.16-git-wheatfox";
-            modDirVersion = "6.16.0-rc2";
-            src = /home/wheatfox/tryredox/linux-dev/linux-git;
-            configfile = /home/wheatfox/tryredox/linux-dev/build/.config;
+            modDirVersion = "6.16.0-rc3"; # 20250623
+            src = ../linux-git;
+            configfile = ../build/.config;
             kernelPatches = [];
             extraMeta.branch = "6.16";
           });

@@ -13,12 +13,12 @@ ROOT_MOUNT="$MOUNT_DIR/root"
 
 cleanup() {
     echo "Cleaning up..."
-    if mountpoint -q "$ROOT_MOUNT"; then
+    while mountpoint -q "$ROOT_MOUNT"; do
         sudo umount "$ROOT_MOUNT"
-    fi
-    if mountpoint -q "$BOOT_MOUNT"; then
+    done
+    while mountpoint -q "$BOOT_MOUNT"; do
         sudo umount "$BOOT_MOUNT"
-    fi
+    done
     if [ -e "$LOOP_DEV" ]; then
         sudo losetup -d "$LOOP_DEV"
     fi

@@ -1,6 +1,12 @@
 { pkgs }:
 
+let 
+  busybox_static = pkgs.busybox.overrideAttrs (oldAttrs: {
+    enableStatic = true;
+  });
+in
 with pkgs; [
+  busybox_static
   vim
   htop
   tmux
@@ -19,11 +25,7 @@ with pkgs; [
   xz
   unzip
   tree
-  jq
-  ripgrep
-  fd
-  bat
-  fzf
-  less
   nix
+  pciutils
+  file  
 ] 

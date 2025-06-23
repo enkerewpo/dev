@@ -43,6 +43,12 @@ if [ ! -f "$SD_IMAGE_PATH" ]; then
     exit 1
 fi
 
+# Check if tools directory exists
+if [ ! -d "tools" ]; then
+    echo "Warning: tools directory not found, creating empty tools directory..."
+    mkdir -p tools
+fi
+
 # Kill any existing QEMU processes
 echo "Cleaning up any existing QEMU processes..."
 pkill -f "qemu-system-${ARCH}" || true
@@ -61,6 +67,8 @@ QEMU_OPTS=(
     "-smp" "1"
     "-drive" "file=${SD_IMAGE_PATH},format=raw,if=none,id=sd"
     "-device" "virtio-blk-pci,drive=sd,bus=pcie.0,addr=0x5"
+    "-drive" "file=fat:rw:tools,format=raw,if=none,id=tools"
+    "-device" "virtio-blk-pci,drive=tools,bus=pcie.0,addr=0x7"
     "-serial" "mon:stdio"
     "-device" "virtio-net-pci,netdev=net0,bus=pcie.0,addr=0x6"
     "-netdev" "user,id=net0"
@@ -80,7 +88,7 @@ if [[ "${BOOT_TYPE}" == "uefi" ]]; then
     QEMU_OPTS+=(
         "-bios" "${FIRMWARE_FILE}"
         "-kernel" "${KERNEL_PATH}"
-        "-append" "console=${CONSOLE_DEVICE} root=/dev/vda2 rw"
+        "-append" "console=${CONSOLE_DEVICE} root=/dev/vda2 rw debug"
     )
 else
     echo "Configuring legacy boot..."
@@ -93,7 +101,7 @@ else
     
     QEMU_OPTS+=(
         "-kernel" "${KERNEL_PATH}"
-        "-append" "console=${CONSOLE_DEVICE} root=/dev/vda2 rw"
+        "-append" "console=${CONSOLE_DEVICE} root=/dev/vda2 rw debug"
     )
 fi
 
@@ -121,6 +129,7 @@ echo "Starting QEMU for ${ARCH} architecture with ${BOOT_TYPE} boot..."
 echo "Image: ${SD_IMAGE_PATH}"
 echo "Kernel: ${KERNEL_PATH}"
 echo "Firmware: ${FIRMWARE_FILE}"
+echo "Tools directory mounted as second disk (virtio-blk-pci at addr=0x7)"
 echo "Command: qemu-system-${QEMU_SUFFIX} ${QEMU_OPTS[*]}"
 echo ""
 
