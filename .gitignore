@@ -45,3 +45,5 @@ modules-install
 build*
 image
 root
+boot
+mount

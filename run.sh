@@ -8,9 +8,8 @@ ARCH_CONFIGS=(
 
 ARCH=$1
 if [ -z "$ARCH" ]; then
-    echo "Usage: $0 <arch>"
-    echo "Supported architectures: $(printf '%s ' "${ARCH_CONFIGS[@]}" | cut -d: -f1)"
-    exit 1
+    echo "not setting arch, use default loongarch64"
+    ARCH="loongarch64"
 fi
 
 # Set architecture-specific variables
@@ -81,7 +80,7 @@ if [[ "${BOOT_TYPE}" == "uefi" ]]; then
     QEMU_OPTS+=(
         "-bios" "${FIRMWARE_FILE}"
         "-kernel" "${KERNEL_PATH}"
-        "-append" "console=${CONSOLE_DEVICE} root=/dev/vda2 rw debug init=/nix/store/d25zk5h758fbif6ab3bbxb19lyi21rpw-busybox-loongarch64-unknown-linux-gnu-1.36.1/bin/sh"
+        "-append" "console=${CONSOLE_DEVICE} root=/dev/vda2 rw"
     )
 else
     echo "Configuring legacy boot..."
@@ -94,7 +93,7 @@ else
     
     QEMU_OPTS+=(
         "-kernel" "${KERNEL_PATH}"
-        "-append" "console=${CONSOLE_DEVICE} root=/dev/vda2 rw debug"
+        "-append" "console=${CONSOLE_DEVICE} root=/dev/vda2 rw"
     )
 fi
 

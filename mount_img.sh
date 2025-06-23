@@ -7,8 +7,9 @@ if [ ! -f "$IMG_PATH" ]; then
     exit 1
 fi
 
-BOOT_MOUNT="boot"
-ROOT_MOUNT="root"
+MOUNT_DIR="mount"
+BOOT_MOUNT="$MOUNT_DIR/boot"
+ROOT_MOUNT="$MOUNT_DIR/root"
 
 cleanup() {
     echo "Cleaning up..."
@@ -21,7 +22,7 @@ cleanup() {
     if [ -e "$LOOP_DEV" ]; then
         sudo losetup -d "$LOOP_DEV"
     fi
-    rm -rf "$BOOT_MOUNT" "$ROOT_MOUNT"
+    sudo rm -rf "$MOUNT_DIR"
 }
 
 trap cleanup EXIT

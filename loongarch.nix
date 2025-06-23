@@ -15,6 +15,19 @@ in {
       boot.kernelPackages = pkgs.linuxKernel.packages.linux_local;
       boot.initrd.enable = false;
       boot.initrd.kernelModules = [];
+      environment.systemPackages = import ./nix-config/packages.nix { inherit pkgs; };
+      
+      users.users = {
+        wheatfox = {
+          isNormalUser = true;
+          description = "wheatfox";
+          extraGroups = [ "wheel" "networkmanager" "video" "audio" ];
+          password = "1234";
+        };
+      };
+      
+      security.sudo.wheelNeedsPassword = false;
+      services.getty.autologinUser = "wheatfox";
     };
   }).config.system.build.sdImage;
 }
