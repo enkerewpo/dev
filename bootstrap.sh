@@ -516,6 +516,43 @@ build_rootfs() {
     build_nix_rootfs
 }
 
+find_link_file() {
+    local file=$1
+    if [[ -L "${file}" ]]; then
+        echo "$(readlink -f "${file}")"
+    else
+        echo "${file}"
+    fi
+}
+build_libbpf() {
+    log_info "Building libbpf using kernel build system for ${ARCH}"
+
+    local linux_arch
+    linux_arch=$(to_linux_arch "${ARCH}")
+
+    local make_args="ARCH=${linux_arch} CROSS_COMPILE=${CROSS_COMPILE}"
+
+    if [[ ${USE_LLVM} -eq 1 ]]; then
+        make_args+=" LLVM=1 CC=${CLANG} LD=${LLD} AR=${LLVM_AR} NM=${LLVM_NM} STRIP=${LLVM_STRIP} OBJDUMP=${LLVM_OBJDUMP} READELF=${LLVM_READELF}"
+        if [[ "${ARCH}" == "loongarch64" ]]; then
+            make_args+=" KCFLAGS=--target=loongarch64-unknown-linux-gnu"
+        elif [[ "${ARCH}" == "aarch64" ]]; then
+            make_args+=" KCFLAGS=--target=aarch64-unknown-linux-gnu"
+        fi
+    fi
+
+    # enter the libbpf path
+    cd "${LINUX_SRC_DIR}/tools/lib/bpf"
+    # run make with the make_args
+    make clean
+    make ${make_args}
+
+    file "$(find_link_file "${LINUX_SRC_DIR}/tools/lib/bpf/libbpf.so")"
+    file "$(find_link_file "${LINUX_SRC_DIR}/tools/lib/bpf/libbpf.a")"
+
+    log_info "libbpf built. Artifacts are in ${LINUX_SRC_DIR}/tools/lib/bpf/"
+}
+
 run_rust_kunit_tests() {
     log_info "Running Rust KUnit (doctest) tests for ${ARCH}"
     local kunit_py="${LINUX_SRC_DIR}/tools/testing/kunit/kunit.py"
@@ -560,8 +597,10 @@ show_help() {
     echo -e "    ${BOLD}${GREEN}save${RESET}              Save current config as defconfig"
     echo -e "    ${BOLD}${GREEN}kernel${RESET}            Build the kernel (requires def first)"
     echo -e "    ${BOLD}${GREEN}rootfs${RESET}            Build the root filesystem using Nix"
+    echo -e "    ${BOLD}${GREEN}libbpf${RESET}            Build libbpf library for cross compilation"
     echo -e "    ${BOLD}${GREEN}status${RESET}            Show build status and configuration"
     echo -e "    ${BOLD}${GREEN}check${RESET}             Check build dependencies"
+    echo -e "    ${BOLD}${GREEN}install-bindgen${RESET}   Install bindgen-cli"
     echo -e "    ${BOLD}${GREEN}rust-test${RESET}         Run Rust tests"
     echo -e "    ${BOLD}${GREEN}rust-kunit-test${RESET}   Run Rust KUnit (doctest) tests"
     echo -e "    ${BOLD}${GREEN}rust-docs${RESET}         Generate Rust documentation"
@@ -628,7 +667,7 @@ find_closest_command() {
     local input=$1
     local min_distance=999
     local closest_command=""
-    local commands=("help" "def" "clean" "menu" "save" "kernel" "rootfs" "status" "check" "install-bindgen" "rust-test" "rust-kunit-test" "rust-docs")
+    local commands=("help" "def" "clean" "menu" "save" "kernel" "rootfs" "libbpf" "status" "check" "install-bindgen" "rust-test" "rust-kunit-test" "rust-docs")
 
     for cmd in "${commands[@]}"; do
         # Calculate Levenshtein distance
@@ -674,6 +713,7 @@ main() {
     save) save_defconfig ;;
     kernel) build_kernel ;;
     rootfs) build_rootfs ;;
+    libbpf) build_libbpf ;;
     status) show_status ;;
     check) check_build_env ;;
     install-bindgen) install_bindgen ;;

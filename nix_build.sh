@@ -11,7 +11,7 @@ if [ "$ARCH" == "aarch64" ]; then
 elif [ "$ARCH" == "loongarch64" ]; then
     nix-build loongarch.nix --show-trace --log-format bar -A image --out-link image
 else
-    echo "Invalid architecture: $ARCH"
+    echo "error: invalid architecture: $ARCH"
     exit 1
 fi
 
@@ -19,7 +19,7 @@ NIXOS_VERSION="25.11pre-git"
 IMG_PATH="image/sd-image/nixos-image-sd-card-${NIXOS_VERSION}-${ARCH}-linux.img"
 
 if [ ! -f "$IMG_PATH" ]; then
-    echo "Error: Image file not found at $IMG_PATH"
+    echo "error: image file not found at $IMG_PATH"
     exit 1
 fi
 
@@ -28,7 +28,7 @@ BOOT_MOUNT="$MOUNT_DIR/boot"
 ROOT_MOUNT="$MOUNT_DIR/root"
 
 cleanup() {
-    echo "Cleaning up..."
+    echo "cleaning up..."
     while mountpoint -q "$ROOT_MOUNT"; do
         sudo umount "$ROOT_MOUNT"
     done
@@ -44,44 +44,55 @@ cleanup() {
 trap cleanup EXIT
 
 mount_image() {
-    mkdir -p "$BOOT_MOUNT" "$ROOT_MOUNT"
+    sudo mkdir -p "$BOOT_MOUNT" "$ROOT_MOUNT"
 
     LOOP_DEV=$(sudo losetup -f --show "$IMG_PATH")
     sudo partprobe "$LOOP_DEV"
 
-    echo "Mounting boot partition..."
+    echo "mounting boot partition..."
     sudo mount "${LOOP_DEV}p1" "$BOOT_MOUNT"
     if [ $? -ne 0 ]; then
-        echo "Error: Failed to mount boot partition"
+        echo "error: failed to mount boot partition"
         exit 1
     fi
 
-    echo "Mounting root partition..."
+    echo "mounting root partition..."
     sudo mount "${LOOP_DEV}p2" "$ROOT_MOUNT"
     if [ $? -ne 0 ]; then
-        echo "Error: Failed to mount root partition"
+        echo "error: failed to mount root partition"
         exit 1
     fi
 
-    echo "Image mounted successfully!"
-    echo "Boot partition mounted at: $BOOT_MOUNT"
-    echo "Root partition mounted at: $ROOT_MOUNT"
+    echo "image mounted successfully!"
+    echo "boot partition mounted at: $BOOT_MOUNT"
+    echo "root partition mounted at: $ROOT_MOUNT"
+}
+
+sudo mkdir -p "$ROOT_MOUNT/usr/include"
+sudo mkdir -p "$ROOT_MOUNT/lib"
+
+# copy modules to tools directory
+copy_modules() {
+    MODULE_INSTALL_DIR="build/build/modules-install/lib"
+    if [ -d "$MODULE_INSTALL_DIR" ]; then
+        echo "module install directory found at: $MODULE_INSTALL_DIR"
+        echo "copying modules to tools directory..."
+        sudo cp -r "$MODULE_INSTALL_DIR"/* "$ROOT_MOUNT/lib"
+    else
+        echo "warning: module install directory not found at: $MODULE_INSTALL_DIR, so we will not copy modules to tools directory"
+    fi
+}
+
+# copy libbpf to tools directory
+copy_libbpf() {
+    LIBBPF_DIR="linux-git/tools/lib/bpf"
+    # just copy the entire bpf folder into root /lib/libbpf
+    sudo cp -r "$LIBBPF_DIR" "$ROOT_MOUNT/lib/bpf"
+    echo "libbpf copied to root /lib/bpf/"
 }
 
 mount_image
+copy_modules
+copy_libbpf
 
-MODULE_INSTALL_DIR="build/build/modules-install"
-
-if [ -d "$MODULE_INSTALL_DIR" ]; then
-    echo "Module install directory found at: $MODULE_INSTALL_DIR"
-    echo "Copying modules to tools directory..."
-    sudo cp -r "$MODULE_INSTALL_DIR"/* "$ROOT_MOUNT"
-else
-    echo "Error: Module install directory not found at: $MODULE_INSTALL_DIR"
-    exit 1
-fi
-
-echo "unmounting image..."
-cleanup
-
-echo "Done"
+echo "done"

@@ -3,7 +3,7 @@
 IMG_PATH="image/sd-image/nixos-image-sd-card-25.11pre-git-loongarch64-linux.img"
 
 if [ ! -f "$IMG_PATH" ]; then
-    echo "Error: Image file not found at $IMG_PATH"
+    echo "error: image file not found at $IMG_PATH"
     exit 1
 fi
 
@@ -12,7 +12,7 @@ BOOT_MOUNT="$MOUNT_DIR/boot"
 ROOT_MOUNT="$MOUNT_DIR/root"
 
 cleanup() {
-    echo "Cleaning up..."
+    echo "cleaning up..."
     while mountpoint -q "$ROOT_MOUNT"; do
         sudo umount "$ROOT_MOUNT"
     done
@@ -32,22 +32,22 @@ mkdir -p "$BOOT_MOUNT" "$ROOT_MOUNT"
 LOOP_DEV=$(sudo losetup -f --show "$IMG_PATH")
 sudo partprobe "$LOOP_DEV"
 
-echo "Mounting boot partition..."
+echo "mounting boot partition..."
 sudo mount "${LOOP_DEV}p1" "$BOOT_MOUNT"
 if [ $? -ne 0 ]; then
-    echo "Error: Failed to mount boot partition"
+    echo "error: failed to mount boot partition"
     exit 1
 fi
 
-echo "Mounting root partition..."
+echo "mounting root partition..."
 sudo mount "${LOOP_DEV}p2" "$ROOT_MOUNT"
 if [ $? -ne 0 ]; then
-    echo "Error: Failed to mount root partition"
+    echo "error: failed to mount root partition"
     exit 1
 fi
 
-echo "Image mounted successfully!"
-echo "Boot partition mounted at: $BOOT_MOUNT"
-echo "Root partition mounted at: $ROOT_MOUNT"
-echo "Press Enter to unmount and exit..."
-read 
+echo "image mounted successfully!"
+echo "boot partition mounted at: $BOOT_MOUNT"
+echo "root partition mounted at: $ROOT_MOUNT"
+echo "press enter to unmount and exit..."
+read
