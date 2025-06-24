@@ -60,7 +60,6 @@ for config in "${ARCH_CONFIGS[@]}"; do
         NIX_SYSTEM="${nix_system}"
         NIX_FILE="${nix_file}"
         log_info "Using architecture: ${arch_name}, cross_compile: ${cross_compile}, defconfig: ${defconfig}, nix_system: ${nix_system}, nix_file: ${nix_file}"
-        CROSS_COMPILE=""
         break
     fi
 done
@@ -74,7 +73,7 @@ readonly LOG_DIR="build_logs"
 readonly BUILD_DIR=$(realpath "build")  # New build directory for output, we use realpath to make it absolute
 
 # Dynamic configuration (these should not be readonly)
-USE_LLVM=${USE_LLVM:-1} # Can be overridden by environment variable, default is 1
+USE_LLVM=${USE_LLVM:-0} # Can be overridden by environment variable, default is 0 because atomics intrinsics for loongarch "+BZ" is only supported in GCC now
 LLVM_HOME=${LLVM_HOME:-"/usr/lib/llvm-19/bin"}
 NUM_JOBS=$(nproc)
 
@@ -95,6 +94,10 @@ GNU_GCC=""
 GNU_OBJCOPY=""
 GNU_READELF=""
 GNU_OBJDUMP=""
+GNU_LD=""
+GNU_AR=""
+GNU_NM=""
+GNU_STRIP=""
 
 # LLVM library paths
 LLVM_LIB_PATH="${LLVM_HOME}/../lib"
@@ -170,6 +173,10 @@ check_dependencies() {
     command -v "${GNU_OBJCOPY}" >/dev/null 2>&1 || missing_deps+=("${GNU_OBJCOPY}")
     command -v "${GNU_READELF}" >/dev/null 2>&1 || missing_deps+=("${GNU_READELF}")
     command -v "${GNU_OBJDUMP}" >/dev/null 2>&1 || missing_deps+=("${GNU_OBJDUMP}")
+    command -v "${GNU_LD}" >/dev/null 2>&1 || missing_deps+=("${GNU_LD}")
+    command -v "${GNU_AR}" >/dev/null 2>&1 || missing_deps+=("${GNU_AR}")
+    command -v "${GNU_NM}" >/dev/null 2>&1 || missing_deps+=("${GNU_NM}")
+    command -v "${GNU_STRIP}" >/dev/null 2>&1 || missing_deps+=("${GNU_STRIP}")
 
     if ((${#missing_deps[@]} > 0)); then
         log_error "Missing required dependencies:"
@@ -366,12 +373,20 @@ setup_toolchain() {
         GNU_OBJCOPY=$(get_gnu_tool "objcopy")
         GNU_READELF=$(get_gnu_tool "readelf")
         GNU_OBJDUMP=$(get_gnu_tool "objdump")
+        GNU_LD=$(get_gnu_tool "ld")
+        GNU_AR=$(get_gnu_tool "ar")
+        GNU_NM=$(get_gnu_tool "nm")
+        GNU_STRIP=$(get_gnu_tool "strip")
 
         log_info "GNU toolchain configuration:"
         log_info "  GCC: ${GNU_GCC}"
         log_info "  OBJCOPY: ${GNU_OBJCOPY}"
         log_info "  READELF: ${GNU_READELF}"
         log_info "  OBJDUMP: ${GNU_OBJDUMP}"
+        log_info "  LD: ${GNU_LD}"
+        log_info "  AR: ${GNU_AR}"
+        log_info "  NM: ${GNU_NM}"
+        log_info "  STRIP: ${GNU_STRIP}"
     fi
 }
 
@@ -460,21 +475,6 @@ build_kernel() {
     eval "${cmd}"
 
     local build_log="${LOG_DIR}/build_$(date +%Y%m%d_%H%M%S).log"
-
-    # check .config to have CONFIG_RUST=y and CONFIG_MODVERSIONS not enabled
-    if ! grep -q "CONFIG_RUST=y" "${BUILD_DIR}/.config"; then
-        log_warn "CONFIG_RUST is not enabled in .config, adding it to .config, we also disable CONFIG_MODVERSIONS here"
-        # add CONFIG_RUST=y to .config
-        echo "CONFIG_RUST=y" >> "${BUILD_DIR}/.config"
-        # remove CONFIG_MODVERSIONS=y from .config
-        sed -i '/CONFIG_MODVERSIONS=y/d' "${BUILD_DIR}/.config" || true
-        # no compress modules!
-        sed -i '/CONFIG_MODULE_COMPRESS/d' "${BUILD_DIR}/.config" || true
-        # CONFIG_DEBUG_INFO_BTF=y, first we remove the line, then we add it back
-        sed -i '/CONFIG_DEBUG_INFO_BTF/d' "${BUILD_DIR}/.config" || true
-        echo "CONFIG_DEBUG_INFO_BTF=y" >> "${BUILD_DIR}/.config"
-    fi
-
     # then let it auto config again
     make -C "${LINUX_SRC_DIR}" $(get_make_args) olddefconfig
     
@@ -590,10 +590,23 @@ run_rust_kunit_tests() {
             --kconfig_add CONFIG_RUST_KERNEL_DOCTESTS=y)
 }
 
+get_make_args_gcc() {
+    local args="O=${BUILD_DIR} ARCH=$(to_linux_arch "${ARCH}") CROSS_COMPILE=${CROSS_COMPILE}"
+    args+=" LLVM=0"
+    args+=" CC=${GNU_GCC}"
+    args+=" LD=${GNU_LD}"
+    args+=" AR=${GNU_AR}"
+    args+=" NM=${GNU_NM}"
+    args+=" STRIP=${GNU_STRIP}"
+    args+=" OBJDUMP=${GNU_OBJDUMP}"
+    args+=" READELF=${GNU_READELF}"
+    echo "${args}"
+}
+
 build_ebpf_kernel_samples() {
     log_info "Building eBPF kernel samples"
     cd "${LINUX_SRC_DIR}/samples/bpf"
-    args=$(get_make_args)
+    args=$(get_make_args_gcc)
     # args+=" V=1"
     echo "args: ${args}"
     make -C "${LINUX_SRC_DIR}/samples/bpf" ${args}
