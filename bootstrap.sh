@@ -37,7 +37,7 @@ export NIXPKGS_ALLOW_UNSUPPORTED_SYSTEM=1
 
 # Architecture configuration
 ARCH_CONFIGS=(
-    "loongarch64:loongarch64-unknown-linux-gnu-:loongson3_defconfig:loongarch64-linux:loongarch.nix"
+    "loongarch64:loongarch64-unknown-linux-gnu-:wheatfox_defconfig:loongarch64-linux:loongarch.nix"
     "aarch64:aarch64-unknown-linux-gnu-:defconfig:aarch64-linux:aarch64.nix"
 )
 
@@ -288,7 +288,7 @@ build_nix_rootfs() {
 
     # log_info "Nix rootfs built successfully in ${NIX_ROOTFS_DIR}/mount"
 
-    ./nix_build.sh "${ARCH}"
+    ./nix_build.sh
 }
 
 ###################
@@ -604,13 +604,13 @@ get_make_args_gcc() {
 }
 
 build_ebpf_kernel_samples() {
-    log_info "Building eBPF kernel samples"
+    log_info "Building eBPF kernel samples with static linking"
     cd "${LINUX_SRC_DIR}/samples/bpf"
     args=$(get_make_args_gcc)
     # args+=" V=1"
     echo "args: ${args}"
     make -C "${LINUX_SRC_DIR}/samples/bpf" ${args}
-    log_info "ebpf kernel samples built"
+    log_info "ebpf kernel samples built with static linking"
 }
 
 show_help() {

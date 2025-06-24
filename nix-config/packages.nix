@@ -1,12 +1,6 @@
 { pkgs }:
 
-let 
-  busybox_static = pkgs.busybox.overrideAttrs (oldAttrs: {
-    enableStatic = true;
-  });
-in
 with pkgs; [
-  busybox_static
   vim
   htop
   tmux
@@ -27,5 +21,14 @@ with pkgs; [
   tree
   nix
   pciutils
-  file  
+  file
+  pkg-config
+  elfutils
+  zlib
+  libelf
+  lsof
+  gcc
+  clang
+  pahole
+  libbpf
 ] 

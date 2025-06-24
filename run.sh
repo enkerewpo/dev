@@ -88,7 +88,7 @@ if [[ "${BOOT_TYPE}" == "uefi" ]]; then
     QEMU_OPTS+=(
         "-bios" "${FIRMWARE_FILE}"
         "-kernel" "${KERNEL_PATH}"
-        "-append" "console=${CONSOLE_DEVICE} root=/dev/vda2 rw debug"
+        "-append" "console=${CONSOLE_DEVICE} root=/dev/vda2 rw"
     )
 else
     echo "Configuring legacy boot..."
