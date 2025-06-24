@@ -458,8 +458,13 @@ save_defconfig() {
     if [[ ! -f "${BUILD_DIR}/.config" ]]; then
         die "No .config file found in ${BUILD_DIR}"
     fi
-    cp -v "${BUILD_DIR}/.config" "${LINUX_SRC_DIR}/arch/${ARCH}/configs/${TARGET_DEFCONFIG}"
-    cp -v "${BUILD_DIR}/.config" "configs/${TARGET_DEFCONFIG}"
+    echo "Are you sure you want to save the defconfig? The config will be saved to ./configs/${TARGET_DEFCONFIG}"
+    read -p "Enter 'y' to continue: " confirm
+    if [[ "${confirm}" != "y" ]]; then
+        log_info "Defconfig not saved"
+        return
+    fi
+    cp -v "${BUILD_DIR}/.config" "./configs/${TARGET_DEFCONFIG}"
 }
 
 build_kernel() {
