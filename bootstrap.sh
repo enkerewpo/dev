@@ -452,6 +452,9 @@ build_kernel() {
 
     rm -rf "${BUILD_DIR}/modules-install"
 
+    # mrproper the source
+    make -C "${LINUX_SRC_DIR}" ARCH="$(to_linux_arch "${ARCH}")" mrproper
+
     # Check Rust availability
     log_info "Checking Rust availability for kernel build"
 
