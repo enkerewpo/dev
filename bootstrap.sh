@@ -429,8 +429,14 @@ run_defconfig() {
     log_info "Cleaning source tree"
     make -C "${LINUX_SRC_DIR}" ARCH="$(to_linux_arch "${ARCH}")" mrproper
     
+    # then copy from ./configs/${TARGET_DEFCONFIG} to ${LINUX_SRC_DIR}/arch/${ARCH}/configs/${TARGET_DEFCONFIG}
+    cp -v "./configs/${TARGET_DEFCONFIG}" "${LINUX_SRC_DIR}/arch/$(to_linux_arch "${ARCH}")/configs/${TARGET_DEFCONFIG}"
+
     # Then run defconfig
     make -C "${LINUX_SRC_DIR}" $(get_make_args) "${TARGET_DEFCONFIG}"
+
+    # remove the copied defconfig
+    rm -v "${LINUX_SRC_DIR}/arch/$(to_linux_arch "${ARCH}")/configs/${TARGET_DEFCONFIG}"
 }
 
 clean_build() {
