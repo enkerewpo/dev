@@ -60,13 +60,10 @@ for config in "${ARCH_CONFIGS[@]}"; do
         NIX_SYSTEM="${nix_system}"
         NIX_FILE="${nix_file}"
         log_info "Using architecture: ${arch_name}, cross_compile: ${cross_compile}, defconfig: ${defconfig}, nix_system: ${nix_system}, nix_file: ${nix_file}"
+        CROSS_COMPILE=""
         break
     fi
 done
-
-if [[ -z "${CROSS_COMPILE}" ]]; then
-    die "Unsupported architecture: ${ARCH}. Supported architectures: $(printf '%s ' "${ARCH_CONFIGS[@]}" | cut -d: -f1)"
-fi
 
 readonly ARCH
 readonly CROSS_COMPILE
@@ -431,7 +428,8 @@ clean_build() {
 
 run_menuconfig() {
     log_info "Running menuconfig"
-    make $(get_make_args) menuconfig
+    make -C "${LINUX_SRC_DIR}" ARCH="$(to_linux_arch "${ARCH}")" mrproper
+    make -C "${LINUX_SRC_DIR}" $(get_make_args) menuconfig
 }
 
 save_defconfig() {
@@ -463,13 +461,23 @@ build_kernel() {
 
     local build_log="${LOG_DIR}/build_$(date +%Y%m%d_%H%M%S).log"
 
-    # check .config to have CONFIG_RUST=y
+    # check .config to have CONFIG_RUST=y and CONFIG_MODVERSIONS not enabled
     if ! grep -q "CONFIG_RUST=y" "${BUILD_DIR}/.config"; then
-        log_warn "CONFIG_RUST is not enabled in .config, adding it to .config"
+        log_warn "CONFIG_RUST is not enabled in .config, adding it to .config, we also disable CONFIG_MODVERSIONS here"
         # add CONFIG_RUST=y to .config
         echo "CONFIG_RUST=y" >> "${BUILD_DIR}/.config"
+        # remove CONFIG_MODVERSIONS=y from .config
+        sed -i '/CONFIG_MODVERSIONS=y/d' "${BUILD_DIR}/.config" || true
+        # no compress modules!
+        sed -i '/CONFIG_MODULE_COMPRESS/d' "${BUILD_DIR}/.config" || true
+        # CONFIG_DEBUG_INFO_BTF=y, first we remove the line, then we add it back
+        sed -i '/CONFIG_DEBUG_INFO_BTF/d' "${BUILD_DIR}/.config" || true
+        echo "CONFIG_DEBUG_INFO_BTF=y" >> "${BUILD_DIR}/.config"
     fi
 
+    # then let it auto config again
+    make -C "${LINUX_SRC_DIR}" $(get_make_args) olddefconfig
+    
     if ! make -C "${LINUX_SRC_DIR}" $(get_make_args) -j"${NUM_JOBS}" 2>&1 | tee "${build_log}"; then
         log_error "Build failed. See ${build_log} for details"
         exit 1

@@ -17,7 +17,8 @@ use run.sh to start a qemu boot the built kernel + rootfs.
 NOTES
 =====
 
-to enable CONFIG_RUST in menuconfig, MODVERSION should be disabled.
+1. to enable CONFIG_RUST in menuconfig, MODVERSION should be disabled.
+2. sudo apt install dwarves # for pahole to enable BTF in kernel config
 
 EXAMPLE QEMU NIXOS BOOT (LOONGARCH64)
 =====================================
