@@ -8,6 +8,27 @@
 
 set -euo pipefail
 
+###################
+# Logging Functions
+###################
+
+log_info() {
+    echo -e "\033[0;32m[INFO]\033[0m $1"
+}
+
+log_warn() {
+    echo -e "\033[0;33m[WARN]\033[0m $1" >&2
+}
+
+log_error() {
+    echo -e "\033[0;31m[ERROR]\033[0m $1" >&2
+}
+
+die() {
+    log_error "$1"
+    exit 1
+}
+
 export NIXPKGS_ALLOW_UNSUPPORTED_SYSTEM=1
 
 ###################
@@ -38,6 +59,7 @@ for config in "${ARCH_CONFIGS[@]}"; do
         TARGET_DEFCONFIG="${defconfig}"
         NIX_SYSTEM="${nix_system}"
         NIX_FILE="${nix_file}"
+        log_info "Using architecture: ${arch_name}, cross_compile: ${cross_compile}, defconfig: ${defconfig}, nix_system: ${nix_system}, nix_file: ${nix_file}"
         break
     fi
 done
@@ -52,7 +74,7 @@ readonly TARGET_DEFCONFIG
 readonly NIX_SYSTEM
 readonly NIX_FILE
 readonly LOG_DIR="build_logs"
-readonly BUILD_DIR="build"  # New build directory for output
+readonly BUILD_DIR=$(realpath "build")  # New build directory for output, we use realpath to make it absolute
 
 # Dynamic configuration (these should not be readonly)
 USE_LLVM=${USE_LLVM:-1} # Can be overridden by environment variable, default is 1
@@ -90,27 +112,6 @@ RUST_LIB_SRC="$(${RUSTC} --print sysroot)/lib/rustlib/src/rust/library"
 # Nix configuration
 NIX_ROOTFS_DIR="nix-rootfs"
 NIX_CONFIG_DIR="nix-config"
-
-###################
-# Logging Functions
-###################
-
-log_info() {
-    echo -e "\033[0;32m[INFO]\033[0m $1"
-}
-
-log_warn() {
-    echo -e "\033[0;33m[WARN]\033[0m $1" >&2
-}
-
-log_error() {
-    echo -e "\033[0;31m[ERROR]\033[0m $1" >&2
-}
-
-die() {
-    log_error "$1"
-    exit 1
-}
 
 ###################
 # Utility Functions
@@ -334,6 +335,7 @@ setup_toolchain() {
         LLVM_AR=$(find_tool "llvm-ar")
         LLVM_NM=$(find_tool "llvm-nm")
         LLVM_STRIP=$(find_tool "llvm-strip")
+        LLVM_LLC=$(find_tool "llc")
 
         # Verify all LLVM tools are found
         [[ -n "${CLANG}" ]] || die "clang not found"
@@ -344,7 +346,7 @@ setup_toolchain() {
         [[ -n "${LLVM_AR}" ]] || die "llvm-ar not found"
         [[ -n "${LLVM_NM}" ]] || die "llvm-nm not found"
         [[ -n "${LLVM_STRIP}" ]] || die "llvm-strip not found"
-
+        [[ -n "${LLVM_LLC}" ]] || die "llc not found"
         # Set LLVM library path
         LLVM_LIB_PATH="${LLVM_HOME}/../lib"
         export LD_LIBRARY_PATH="${LLVM_LIB_PATH}:${LD_LIBRARY_PATH:-}"
@@ -359,6 +361,7 @@ setup_toolchain() {
         log_info "  OBJCOPY: ${LLVM_OBJCOPY}"
         log_info "  READELF: ${LLVM_READELF}"
         log_info "  OBJDUMP: ${LLVM_OBJDUMP}"
+        log_info "  LLC: ${LLVM_LLC}"
     else
         log_info "Using GNU toolchain"
         # Set up GNU tools for non-LLVM builds
@@ -377,7 +380,7 @@ setup_toolchain() {
 
 # Get make arguments based on toolchain
 get_make_args() {
-    local args="-C ${LINUX_SRC_DIR} O=../build ARCH=$(to_linux_arch "${ARCH}") CROSS_COMPILE=${CROSS_COMPILE}"
+    local args="O=${BUILD_DIR} ARCH=$(to_linux_arch "${ARCH}") CROSS_COMPILE=${CROSS_COMPILE}"
 
     if [[ ${USE_LLVM} -eq 1 ]]; then
         args+=" LLVM=1"
@@ -389,8 +392,7 @@ get_make_args() {
         args+=" OBJDUMP=${LLVM_OBJDUMP}"
         args+=" READELF=${LLVM_READELF}"
         args+=" LLVM_LINKER=${LLD}"
-        # remove CROSS_COMPILE from args
-        args=$(echo "${args}" | sed "s/${CROSS_COMPILE}//g")
+        args+=" LLC=${LLVM_LLC}"
     fi
 
     echo "${args}"
@@ -416,7 +418,7 @@ run_defconfig() {
     make -C "${LINUX_SRC_DIR}" ARCH="$(to_linux_arch "${ARCH}")" mrproper
     
     # Then run defconfig
-    make $(get_make_args) "${TARGET_DEFCONFIG}"
+    make -C "${LINUX_SRC_DIR}" $(get_make_args) "${TARGET_DEFCONFIG}"
 }
 
 clean_build() {
@@ -453,7 +455,7 @@ build_kernel() {
     # Check Rust availability
     log_info "Checking Rust availability for kernel build"
 
-    cmd="make $(get_make_args) rustavailable"
+    cmd="make -C ${LINUX_SRC_DIR} $(get_make_args) rustavailable"
     eval "${cmd}"
 
     local build_log="${LOG_DIR}/build_$(date +%Y%m%d_%H%M%S).log"
@@ -465,7 +467,7 @@ build_kernel() {
         echo "CONFIG_RUST=y" >> "${BUILD_DIR}/.config"
     fi
 
-    if ! make $(get_make_args) -j"${NUM_JOBS}" 2>&1 | tee "${build_log}"; then
+    if ! make -C "${LINUX_SRC_DIR}" $(get_make_args) -j"${NUM_JOBS}" 2>&1 | tee "${build_log}"; then
         log_error "Build failed. See ${build_log} for details"
         exit 1
     fi
@@ -487,12 +489,16 @@ build_kernel() {
     export BINDGEN=$(command -v bindgen)
     export CC="${CLANG}"
     export RUST_LIB_SRC
-    cmd="make $(get_make_args) rust-analyzer"
+    cmd="make -C ${LINUX_SRC_DIR} $(get_make_args) rust-analyzer"
     echo "${cmd}"
     eval "${cmd}"
 
     # install modules to build directory
-    make $(get_make_args) modules_install INSTALL_MOD_PATH="${BUILD_DIR}/modules-install"
+    make -C "${LINUX_SRC_DIR}" $(get_make_args) modules_install INSTALL_MOD_PATH="${BUILD_DIR}/modules-install"
+
+    # install headers to build
+    make -C "${LINUX_SRC_DIR}" ARCH="$(to_linux_arch "${ARCH}")" INSTALL_HDR_PATH="${BUILD_DIR}/usr" headers_install
+
     log_info "Build completed successfully"
 }
 
@@ -503,12 +509,12 @@ install_bindgen() {
 
 run_rust_tests() {
     log_info "Running Rust tests"
-    make $(get_make_args) rusttest
+    make -C "${LINUX_SRC_DIR}" $(get_make_args) rusttest
 }
 
 generate_rust_docs() {
     log_info "Generating Rust documentation"
-    make $(get_make_args) rustdocs
+    make -C "${LINUX_SRC_DIR}" $(get_make_args) rustdocs
 }
 
 build_rootfs() {
@@ -571,6 +577,16 @@ run_rust_kunit_tests() {
             --kconfig_add CONFIG_RUST=y \
             --kconfig_add CONFIG_KUNIT=y \
             --kconfig_add CONFIG_RUST_KERNEL_DOCTESTS=y)
+}
+
+build_ebpf_kernel_samples() {
+    log_info "Building eBPF kernel samples"
+    cd "${LINUX_SRC_DIR}/samples/bpf"
+    args=$(get_make_args)
+    # args+=" V=1"
+    echo "args: ${args}"
+    make -C "${LINUX_SRC_DIR}/samples/bpf" ${args}
+    log_info "ebpf kernel samples built"
 }
 
 show_help() {
@@ -716,6 +732,7 @@ main() {
     libbpf) build_libbpf ;;
     status) show_status ;;
     check) check_build_env ;;
+    ebpf-kernel-samples) build_ebpf_kernel_samples ;;
     install-bindgen) install_bindgen ;;
     rust-test) run_rust_tests ;;
     rust-kunit-test) run_rust_kunit_tests ;;
