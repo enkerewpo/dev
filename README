@@ -26,17 +26,23 @@ EXAMPLE QEMU NIXOS BOOT (LOONGARCH64)
 
 sh <(curl --proto '=https' --tlsv1.2 -L https://nixos.org/nix/install) # install nix toolchain
 
-you should manually compile qemu-system-loongarch64 using qemu source code(https://github.com/qemu/qemu) and don't use the one
-from apt or other package manager!
+you should manually compile qemu-system-loongarch64 using qemu source code(https://github.com/qemu/qemu) 
+and don't use the one from apt or other package manager because of some buggy issues on UEFI...
 
 make sure qemu-system-loongarch64, nix-build, nix-env are in your PATH
 
 2. clone nixpkgs and linux-dev-wheatfox
 
 mkdir workspace && cd workspace
+
 git clone https://github.com/enkerewpo/nixpkgs # should be placed in the same directory as this repo
 git clone https://github.com/enkerewpo/linux-dev-wheatfox # which is this repo :D
+
 cd linux-dev-wheatfox
+
+git submodule update --init --recursive # we use the linus branch of linux kernel source code as submodule 
+# which is https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+
 ./bootstrap.sh def
 ./bootstrap.sh menu # if you want to change the kernel config
 ./bootstrap.sh kernel
@@ -120,6 +126,14 @@ nixos login: wheatfox (automatic login)
          ▝▀▀▀    ▀▀▀▀▘       ▀▀▀▘
 
 [wheatfox@nixos:~]$ 
+
+NOTES
+=====
+
+other commands:
+
+./bootstrap.sh libbpf # cross build libbpf to target arch
+./bootstrap.sh ebpf-kernel-samples # build linux kernel's samples for ebpf programs and tools, please run `def` + `kernel` command first
 
 TODO
 ====
