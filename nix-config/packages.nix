@@ -4,7 +4,6 @@ with pkgs; [
   # programs
   vim
   htop
-  tmux
   curl
   wget
   fastfetch
@@ -27,4 +26,9 @@ with pkgs; [
   elfutils
   zlib
   lsof
+  # libs
+  glibc
+  libelf
+  zlib
+  zstd
 ] 

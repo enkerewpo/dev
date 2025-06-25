@@ -8,13 +8,12 @@ pkgs.mkShell {
   buildInputs = [
     cross.buildPackages.gcc
     cross.buildPackages.binutils
-    cross.buildPackages.glibc
     cross.buildPackages.libgcc
     cross.buildPackages.libelf
     cross.buildPackages.elfutils
     cross.buildPackages.libffi
     cross.buildPackages.zlib
-    cross.buildPackages.libz
+    cross.buildPackages.zstd
 
     pkgs.llvmPackages.llvm
     pkgs.llvmPackages.libclang

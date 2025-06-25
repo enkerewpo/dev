@@ -6,15 +6,20 @@ LLVM_LLC = llc
 CROSS_COMPILE ?= loongarch64-unknown-linux-gnu-
 CC = $(CROSS_COMPILE)gcc
 BPF_CFLAGS = -g -target bpf -nostdinc -D__TARGET_ARCH_loongarch
-CFLAGS = -g -Wall -Werror -D__TARGET_ARCH_loongarch
+CFLAGS = -g -Wall -Werror -static-libgcc -D__TARGET_ARCH_loongarch
 
 # Kernel headers path - use the Linux source tree
 PROJECT_ROOT ?= ../..
 HEADERS ?= -I$(PROJECT_ROOT)/build/usr/include
 LINUX_SRC ?= $(PROJECT_ROOT)/linux-git
-BPF_HEADERS ?= -I$(LINUX_SRC)/samples/bpf/libbpf/include
-LIBBPF_LIBRARY_DIR ?= -L$(LINUX_SRC)/samples/bpf/libbpf
-LIBBPF_LIBRARY = -lbpf
+# BPF_HEADERS ?= -I$(LINUX_SRC)/samples/bpf/libbpf/include
+# LIBBPF_LIBRARY_DIR ?= -L$(LINUX_SRC)/samples/bpf/libbpf
+BPF_HEADERS ?= -I$(LINUX_SRC)/tools/lib/
+LOCAL_BUILD_LIB_DIR ?= $(PROJECT_ROOT)/lib/result
+LOCAL_BUILD_LIB_INCLUDE ?= -I$(LOCAL_BUILD_LIB_DIR)/include
+LOCAL_BUILD_LIB_LIB ?= -L$(LOCAL_BUILD_LIB_DIR)/lib
+LIBBPF_LIBRARY_DIR ?= -L$(LINUX_SRC)/tools/lib/bpf
+LIBBPF_LIBRARY = -lbpf -lz -lzstd -lelf
 
 TARGET_EBPF_SRCS = $(wildcard *.bpf.c)
 TARGET_LOADER_PROGRAM = ebpf1
@@ -39,12 +44,14 @@ $(TARGET_EBPF_SRCS:.bpf.c=.bpf.o): %.bpf.o: %.bpf.c
 
 # Compile loader program
 $(TARGET_LOADER_PROGRAM): $(TARGET_LOADER_SRC) $(TARGET_EBPF_SRCS:.bpf.c=.bpf.o)
-	$(CC) $(CFLAGS) -static\
+	$(CC) $(CFLAGS)\
 		$(HEADERS) \
 		$(BPF_HEADERS) \
+		$(TARGET_LOADER_SRC) \
+		$(LOCAL_BUILD_LIB_INCLUDE) \
+		$(LOCAL_BUILD_LIB_LIB) \
 		$(LIBBPF_LIBRARY_DIR) \
 		$(LIBBPF_LIBRARY) \
-		$(TARGET_LOADER_SRC) \
 		-o $@
 
 # Clean build artifacts

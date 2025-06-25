@@ -365,14 +365,37 @@ copy_modules() {
     fi
 }
 
+get_real_file() {
+    # # if end with .a or .so, then we recursively get the real file
+    # # else it should be a link to .a or .so we can keep that
+    # local file="$1"
+    # if [[ "$file" == *.a || "$file" == *.so ]]; then
+    #     get_real_file "$(readlink -f "$file")"
+    # else
+    #     echo "$file"
+    # fi
+    # just get the real file
+    local file="$1"
+    while [ -L "$file" ]; do
+        file=$(readlink -f "$file")
+    done
+    echo "$file"
+}
+
 # copy libbpf to tools directory
 copy_libbpf() {
-    LIBBPF_DIR="linux-git/samples/bpf"
-    sudo mkdir -p "$ROOT_MOUNT/usr/share"
+    LIBBPF_DIR="linux-git/tools/lib/bpf"
+    sudo mkdir -p "$ROOT_MOUNT/lib"
     # just copy the entire bpf folder into root /usr/share/bpf
-    log_progress "copying libbpf to root /usr/share/bpf/..."
-    sudo cp -r "$LIBBPF_DIR" "$ROOT_MOUNT/usr/share/bpf"
-    log_success "libbpf copied to root /usr/share/bpf/"
+    log_progress "copying libs to root /lib/..."
+    sudo cp -v "$LIBBPF_DIR"/libbpf.so* "$ROOT_MOUNT/lib/"
+    LIB_RESULT_DIR="lib/result"
+    # for every file in $LIB_RESULT_DIR/lib, copy the real file to root /usr/lib/
+    for file in "$LIB_RESULT_DIR/lib"/*; do
+        sudo cp -rv "$(get_real_file "$file")" "$ROOT_MOUNT/lib/$(basename "$file")"
+    done
+    log_success "libs copied to root /lib/, a quick dump:"
+    sudo ls -l "$ROOT_MOUNT/lib/"
 }
 
 copy_linux_src() {
@@ -396,7 +419,7 @@ sudo find "$ROOT_MOUNT" -type f -exec du -h {} + 2>/dev/null | sort -hr | head -
 
 copy_modules
 copy_libbpf
-copy_linux_src
+# copy_linux_src
 
 log_success "all operations completed successfully!"
 log_info "SD card image is ready for use"
