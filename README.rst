@@ -21,7 +21,7 @@ you can see we have a shell.nix file in the root directory, right, that's it!
 
 to enter the shell, run: `nix-shell` (remember to install nix toolchain first, see below)
 
-nix-shell # enter the shell
+nix-shell "shell-loongarch64.nix"
 
 then use the bootstrap.sh script as usual. :D
 
