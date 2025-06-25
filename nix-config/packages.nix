@@ -1,6 +1,7 @@
 { pkgs }:
 
 with pkgs; [
+  # programs
   vim
   htop
   tmux
@@ -25,13 +26,5 @@ with pkgs; [
   pkg-config
   elfutils
   zlib
-  libelf
   lsof
-  gcc
-  clang
-  pahole
-  libbpf
-  pkg-config
-  llvm
-  binutils
 ] 

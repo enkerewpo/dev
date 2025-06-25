@@ -655,6 +655,7 @@ show_help() {
     echo -e "    ${BOLD}${GREEN}rust-test${RESET}         Run Rust tests"
     echo -e "    ${BOLD}${GREEN}rust-kunit-test${RESET}   Run Rust KUnit (doctest) tests"
     echo -e "    ${BOLD}${GREEN}rust-docs${RESET}         Generate Rust documentation"
+    echo -e "    ${BOLD}${GREEN}ebpf-samples${RESET}      Build eBPF kernel samples"
     echo
 
     echo -e "${BOLD}${YELLOW}Build Options:${RESET}"
@@ -718,7 +719,11 @@ find_closest_command() {
     local input=$1
     local min_distance=999
     local closest_command=""
-    local commands=("help" "def" "clean" "menu" "save" "kernel" "rootfs" "libbpf" "status" "check" "install-bindgen" "rust-test" "rust-kunit-test" "rust-docs")
+    local commands=("help" 
+    "def" "clean" "menu" "save" "kernel" "rootfs" "libbpf" "status" "check" 
+    "install-bindgen" "rust-test" "rust-kunit-test" "rust-docs"
+    "ebpf-samples"
+    )
 
     for cmd in "${commands[@]}"; do
         # Calculate Levenshtein distance
@@ -767,7 +772,7 @@ main() {
     libbpf) build_libbpf ;;
     status) show_status ;;
     check) check_build_env ;;
-    ebpf-kernel-samples) build_ebpf_kernel_samples ;;
+    ebpf-samples) build_ebpf_kernel_samples ;;
     install-bindgen) install_bindgen ;;
     rust-test) run_rust_tests ;;
     rust-kunit-test) run_rust_kunit_tests ;;

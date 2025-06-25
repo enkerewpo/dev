@@ -1,34 +1,57 @@
 # Makefile for eBPF programs
-CC = clang
+BPF_CC = clang
 LLVM_STRIP = llvm-strip
-BPF_CFLAGS = -g -target bpf -nostdinc
+LLVM_OBJDUMP = llvm-objdump
+LLVM_LLC = llc
+CROSS_COMPILE ?= loongarch64-unknown-linux-gnu-
+CC = $(CROSS_COMPILE)gcc
+BPF_CFLAGS = -g -target bpf -nostdinc -D__TARGET_ARCH_loongarch
+CFLAGS = -g -Wall -Werror -D__TARGET_ARCH_loongarch
 
 # Kernel headers path - use the Linux source tree
-KERNEL_HEADERS ?= -I../../linux-git/include \
-	-I../../linux-git/include/uapi \
-	-I../../build/include/generated \
-	-I../../build/include/generated/uapi \
-	-I../../build/include
-ARCH_HEADERS ?= -I../../linux-git/arch/loongarch/include \
-	-I../../linux-git/arch/loongarch/include/uapi \
-	-I../../build/arch/loongarch/include/generated/uapi \
-	-I../../build/arch/loongarch/include/generated
-LINUX_SRC ?= ../../linux-git
+PROJECT_ROOT ?= ../..
+HEADERS ?= -I$(PROJECT_ROOT)/build/usr/include
+LINUX_SRC ?= $(PROJECT_ROOT)/linux-git
+BPF_HEADERS ?= -I$(LINUX_SRC)/samples/bpf/libbpf/include
+LIBBPF_LIBRARY_DIR ?= -L$(LINUX_SRC)/samples/bpf/libbpf
+LIBBPF_LIBRARY = -lbpf
+
+TARGET_EBPF_SRCS = $(wildcard *.bpf.c)
+TARGET_LOADER_PROGRAM = ebpf1
+TARGET_LOADER_SRC = $(TARGET_LOADER_PROGRAM).c
 
 # Default target
-all: ebpf1.o
+all: $(TARGET_EBPF_SRCS:.bpf.c=.bpf.o) $(TARGET_LOADER_PROGRAM)
 
 # Compile eBPF program
-ebpf1.o: ebpf1.c
-	$(CC) $(BPF_CFLAGS) \
-		-include ../../linux-git/include/linux/kconfig.h \
-		$(KERNEL_HEADERS) \
-		$(ARCH_HEADERS) \
+$(TARGET_EBPF_SRCS:.bpf.c=.bpf.o): %.bpf.o: %.bpf.c
+	$(BPF_CC) $(BPF_CFLAGS) \
+		$(HEADERS) \
+		$(BPF_HEADERS) \
 		-c $< -o $@
+# also output llvm ir to {filename}.ll
+	$(BPF_CC) $(BPF_CFLAGS) \
+		$(HEADERS) \
+		$(BPF_HEADERS) \
+		-S -emit-llvm -g -O0 -c $< -o $(@:.bpf.o=.ll)
 	$(LLVM_STRIP) -g $@
+	$(LLVM_OBJDUMP) -S $@ > $(@:.bpf.o=.bpf.asm)
+
+# Compile loader program
+$(TARGET_LOADER_PROGRAM): $(TARGET_LOADER_SRC) $(TARGET_EBPF_SRCS:.bpf.c=.bpf.o)
+	$(CC) $(CFLAGS) -static\
+		$(HEADERS) \
+		$(BPF_HEADERS) \
+		$(LIBBPF_LIBRARY_DIR) \
+		$(LIBBPF_LIBRARY) \
+		$(TARGET_LOADER_SRC) \
+		-o $@
 
 # Clean build artifacts
 clean:
-	rm -f *.o
+	rm -f $(TARGET_EBPF_SRCS:.bpf.c=.bpf.o)
+	rm -f $(TARGET_EBPF_SRCS:.bpf.c=.bpf.asm)
+	rm -f $(TARGET_EBPF_SRCS:.bpf.c=.ll)
+	rm -f $(TARGET_LOADER_PROGRAM)
 
 .PHONY: all clean 
