@@ -71,7 +71,7 @@ QEMU_OPTS=(
     "-device" "virtio-blk-pci,drive=tools,bus=pcie.0,addr=0x7"
     "-serial" "mon:stdio"
     "-device" "virtio-net-pci,netdev=net0,bus=pcie.0,addr=0x6"
-    "-netdev" "user,id=net0"
+    "-netdev" "user,id=net0,net=192.168.76.0/24,dhcpstart=192.168.76.9,dns=8.8.8.8"
     "-nographic"
 )
 
@@ -101,7 +101,7 @@ else
     
     QEMU_OPTS+=(
         "-kernel" "${KERNEL_PATH}"
-        "-append" "console=${CONSOLE_DEVICE} root=/dev/vda2 rw debug"
+        "-append" "console=${CONSOLE_DEVICE} root=/dev/vda2 rw"
     )
 fi
 

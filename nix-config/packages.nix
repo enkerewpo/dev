@@ -31,4 +31,7 @@ with pkgs; [
   clang
   pahole
   libbpf
+  pkg-config
+  llvm
+  binutils
 ] 

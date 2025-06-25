@@ -350,7 +350,15 @@ copy_modules() {
         if [ ! -d "$ROOT_MOUNT/lib" ]; then
             sudo mkdir -p "$ROOT_MOUNT/lib"
         fi
-        sudo cp -r "$MODULE_INSTALL_DIR/modules" "$ROOT_MOUNT/lib/modules"
+        # make sure $ROOT_MOUNT/lib exists
+        if [ ! -d "$ROOT_MOUNT/lib" ]; then
+            log_error "this should not happen, lib directory not found in root filesystem"
+            # list root filesystem's dirs
+            log_info "root filesystem's dirs:"
+            sudo ls -l "$ROOT_MOUNT"
+            exit 1
+        fi
+        sudo cp -r "$MODULE_INSTALL_DIR/modules" "$ROOT_MOUNT/lib/"
         log_success "modules copied successfully"
     else
         log_warning "module install directory not found at: $MODULE_INSTALL_DIR, so we will not copy modules to tools directory"
@@ -367,6 +375,15 @@ copy_libbpf() {
     log_success "libbpf copied to root /usr/share/bpf/"
 }
 
+copy_linux_src() {
+    LINUX_SRC_DIR="linux-git"
+    sudo mkdir -p "$ROOT_MOUNT/usr/src"
+    log_progress "copying linux source to root /usr/src/..."
+    # don't copy the .git folder because it's too large
+    sudo cp -r "$LINUX_SRC_DIR" "$ROOT_MOUNT/usr/src/linux"
+    log_success "linux source copied to root /usr/src/linux"
+}
+
 mount_image
 
 # Analyze filesystem usage
@@ -379,6 +396,7 @@ sudo find "$ROOT_MOUNT" -type f -exec du -h {} + 2>/dev/null | sort -hr | head -
 
 copy_modules
 copy_libbpf
+copy_linux_src
 
 log_success "all operations completed successfully!"
 log_info "SD card image is ready for use"

@@ -14,6 +14,17 @@ use bootstrap.sh to:
 
 use run.sh to start a qemu boot the built kernel + rootfs.
 
+OPTIONAL: USING A NIX SHELL FOR BUILDING STUFF
+==============================================
+
+you can see we have a shell.nix file in the root directory, right, that's it!
+
+to enter the shell, run: `nix-shell` (remember to install nix toolchain first, see below)
+
+nix-shell # enter the shell
+
+then use the bootstrap.sh script as usual. :D
+
 NOTES
 =====
 
