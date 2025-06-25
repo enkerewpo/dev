@@ -139,6 +139,12 @@ nixos login: wheatfox (automatic login)
 
 [wheatfox@nixos:~]$ 
 
+after boot, mount the tools dir and run ebpf programs:
+
+sudo mkdir -p /mnt && sudo mount /dev/vdb1 /mnt && cd /mnt/ebpf-programs;
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/lib64:/lib:/run/current-system/sw/lib:/usr/share/bpf;
+sudo env LD_LIBRARY_PATH=$LD_LIBRARY_PATH ./ebpf1;
+
 NOTES
 =====
 
