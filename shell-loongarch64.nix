@@ -21,10 +21,18 @@ pkgs.mkShell {
     pkgs.llvmPackages.clang-unwrapped.dev
     pkgs.llvmPackages.clang-unwrapped.lib
     pkgs.llvmPackages.clang-unwrapped.lib.dev
+    pkgs.gnumake
+    pkgs.cmake
+    pkgs.ninja
+    pkgs.pkg-config
     pkgs.libffi
     pkgs.zlib
     pkgs.libedit
     pkgs.libz
+    pkgs.bpftools
+    pkgs.bear
+    pkgs.clang
+    pkgs.llvm
   ];
   shellHook = ''
     COLOR_YELLOW='\033[1;33m'

@@ -5,3 +5,5 @@ ebpf1
 # clang stuff
 *.d
 *.ll
+vmlinux.h
+*.info

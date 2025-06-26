@@ -23,11 +23,30 @@ in {
           description = "wheatfox";
           extraGroups = [ "wheel" "networkmanager" "video" "audio" ];
           password = "1234";
+          shell = pkgs.bash;
         };
       };
       
       security.sudo.wheelNeedsPassword = false;
       services.getty.autologinUser = "wheatfox";
+      
+      # Configure bashrc for wheatfox user
+      environment.etc."bashrc".text = ''
+        # Source global definitions
+        if [ -f /etc/bashrc ]; then
+          . /etc/bashrc
+        fi
+        
+        # Auto-mount and setup for eBPF programs
+        if [ "$(whoami)" = "wheatfox" ]; then
+          # Create mount point and mount vdb1
+          sudo mkdir -p /mnt 2>/dev/null || true
+          sudo mount /dev/vdb1 /mnt 2>/dev/null || true
+          
+          # Set LD_LIBRARY_PATH
+          export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/lib64:/lib:/run/current-system/sw/lib:/usr/share/bpf
+        fi
+      '';
     };
   }).config.system.build.sdImage;
 }
