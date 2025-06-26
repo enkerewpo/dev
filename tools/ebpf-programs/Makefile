@@ -6,7 +6,7 @@ LLVM_READELF = llvm-readelf
 LLVM_LLC = llc
 CROSS_COMPILE ?= loongarch64-unknown-linux-gnu-
 CC = $(CROSS_COMPILE)gcc
-BPF_CFLAGS = -g -target bpf -nostdinc -D__TARGET_ARCH_loongarch
+BPF_CFLAGS = -g -O2 -target bpf -nostdinc -D__TARGET_ARCH_loongarch
 CFLAGS = -g -Wall -Werror -static-libgcc -D__TARGET_ARCH_loongarch
 BPFTOOL = bpftool
 
@@ -24,7 +24,7 @@ LIBBPF_LIBRARY_DIR ?= -L$(LINUX_SRC)/tools/lib/bpf
 LIBBPF_LIBRARY = -lbpf -lz -lzstd -lelf
 
 TARGET_EBPF_SRCS = $(wildcard *.bpf.c)
-TARGET_LOADER_PROGRAM = ebpf1
+TARGET_LOADER_PROGRAM = loader
 TARGET_LOADER_SRC = $(TARGET_LOADER_PROGRAM).c
 
 all: $(TARGET_EBPF_SRCS:.bpf.c=.bpf.o) $(TARGET_LOADER_PROGRAM)
@@ -35,9 +35,9 @@ vmlinux.h:
 # Compile eBPF program
 $(TARGET_EBPF_SRCS:.bpf.c=.bpf.o): %.bpf.o: %.bpf.c vmlinux.h
 	$(BPF_CC) $(BPF_CFLAGS) $(HEADERS) $(BPF_HEADERS) -c $< -o $@
-	$(BPF_CC) $(BPF_CFLAGS) $(HEADERS) $(BPF_HEADERS) -S -emit-llvm -g -O0 -c $< -o $(@:.bpf.o=.ll)
+	$(BPF_CC) $(BPF_CFLAGS) $(HEADERS) $(BPF_HEADERS) -S -emit-llvm -g -O0 -c $< -o $(@:.bpf.o=.bpf.ll)
 	$(LLVM_STRIP) -g $@
-	$(LLVM_OBJDUMP) -d $@ > $(@:.bpf.o=.bpf.asm)
+	$(LLVM_OBJDUMP) -D $@ > $(@:.bpf.o=.bpf.asm)
 	$(LLVM_READELF) -a $@ > $(@:.bpf.o=.bpf.info)
 
 # Compile loader program
@@ -48,8 +48,10 @@ clean:
 	rm -f $(TARGET_EBPF_SRCS:.bpf.c=.bpf.o)
 	rm -f $(TARGET_EBPF_SRCS:.bpf.c=.bpf.asm)
 	rm -f $(TARGET_EBPF_SRCS:.bpf.c=.bpf.info)
-	rm -f $(TARGET_EBPF_SRCS:.bpf.c=.ll)
+	rm -f $(TARGET_EBPF_SRCS:.bpf.c=.bpf.ll)
 	rm -f $(TARGET_LOADER_PROGRAM)
+	rm -f $(TARGET_LOADER_PROGRAM).o
+	rm -f $(TARGET_LOADER_PROGRAM).d
 	rm -f vmlinux.h
 
 .PHONY: all clean 

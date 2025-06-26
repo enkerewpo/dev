@@ -7,3 +7,4 @@ ebpf1
 *.ll
 vmlinux.h
 *.info
+loader

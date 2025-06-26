@@ -17,9 +17,13 @@ struct syscalls_enter_write_args {
 };
 
 SEC("tp/syscalls/sys_enter_write")
-int handle_tp(struct syscalls_enter_write_args *ctx) {
+int handle_write(struct syscalls_enter_write_args *ctx) {
   pid_t pid = bpf_get_current_pid_tgid() >> 32;
-  bpf_printk("BPF triggered sys_enter_write from PID %d.\n", pid);
+  struct task_struct *task = (struct task_struct *)bpf_get_current_task_btf();
+  // if (bpf_strncmp(task->comm, TASK_COMM_LEN, "bpftool") == 0) {
+  //   return 0;
+  // }
+  bpf_printk("BPF triggered sys_enter_write from PID %d\n", pid);
   return 0;
 }
 
