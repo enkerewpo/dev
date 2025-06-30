@@ -62,9 +62,8 @@ sudo chmod 666 "$SD_IMAGE_PATH"
 
 # Common QEMU parameters
 QEMU_OPTS=(
-    "-m" "4G"
+    "-m" "8G"
     "-cpu" "${CPU_TYPE}"
-    "-smp" "1"
     "-drive" "file=${SD_IMAGE_PATH},format=raw,if=none,id=sd"
     "-device" "virtio-blk-pci,drive=sd,bus=pcie.0,addr=0x5"
     "-drive" "file=fat:rw:tools,format=raw,if=none,id=tools"
