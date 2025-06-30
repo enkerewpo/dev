@@ -73,7 +73,7 @@ readonly LOG_DIR="build_logs"
 readonly BUILD_DIR=$(realpath "build")  # New build directory for output, we use realpath to make it absolute
 
 # Dynamic configuration (these should not be readonly)
-USE_LLVM=${USE_LLVM:-0} # Can be overridden by environment variable, default is 0 because atomics intrinsics for loongarch "+BZ" is only supported in GCC now
+USE_LLVM=${USE_LLVM:-1} # Can be overridden by environment variable, default is 0 because atomics intrinsics for loongarch "+BZ" is only supported in GCC now
 LLVM_HOME=${LLVM_HOME:-"/usr/lib/llvm-19/bin"}
 NUM_JOBS=$(nproc)
 
@@ -480,14 +480,14 @@ build_kernel() {
     make -C "${LINUX_SRC_DIR}" ARCH="$(to_linux_arch "${ARCH}")" mrproper
 
     # Check Rust availability
-    log_info "Checking Rust availability for kernel build"
+    # log_info "Checking Rust availability for kernel build"
 
-    cmd="make -C ${LINUX_SRC_DIR} $(get_make_args) rustavailable"
-    eval "${cmd}"
+    # cmd="make -C ${LINUX_SRC_DIR} $(get_make_args) rustavailable"
+    # eval "${cmd}"
 
     local build_log="${LOG_DIR}/build_$(date +%Y%m%d_%H%M%S).log"
     # then let it auto config again
-    make -C "${LINUX_SRC_DIR}" $(get_make_args) olddefconfig
+    # make -C "${LINUX_SRC_DIR}" $(get_make_args) olddefconfig
     
     if ! make -C "${LINUX_SRC_DIR}" $(get_make_args) -j"${NUM_JOBS}" 2>&1 | tee "${build_log}"; then
         log_error "Build failed. See ${build_log} for details"
@@ -503,17 +503,17 @@ build_kernel() {
 
     log_info "Generating compile_commands.json"
     cd "${LINUX_SRC_DIR}"
-    python3 scripts/clang-tools/gen_compile_commands.py
+    python3 scripts/clang-tools/gen_compile_commands.py -d "${BUILD_DIR}"
 
-    log_info "Generating rust-project.json for rust-analyzer"
-    # Set required environment variables
-    export RUSTC
-    export BINDGEN=$(command -v bindgen)
-    export CC="${CLANG}"
-    export RUST_LIB_SRC
-    cmd="make -C ${LINUX_SRC_DIR} $(get_make_args) rust-analyzer"
-    echo "${cmd}"
-    eval "${cmd}"
+    # log_info "Generating rust-project.json for rust-analyzer"
+    # # Set required environment variables
+    # export RUSTC
+    # export BINDGEN=$(command -v bindgen)
+    # export CC="${CLANG}"
+    # export RUST_LIB_SRC
+    # cmd="make -C ${LINUX_SRC_DIR} $(get_make_args) rust-analyzer"
+    # echo "${cmd}"
+    # eval "${cmd}"
 
     # install modules to build directory
     make -C "${LINUX_SRC_DIR}" $(get_make_args) modules_install INSTALL_MOD_PATH="${BUILD_DIR}/modules-install"
