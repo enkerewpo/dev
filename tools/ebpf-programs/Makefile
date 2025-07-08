@@ -10,9 +10,12 @@ BPF_CFLAGS = -g -O2 -target bpf -nostdinc -D__TARGET_ARCH_loongarch
 CFLAGS = -g -Wall -Werror -static-libgcc -D__TARGET_ARCH_loongarch
 BPFTOOL = bpftool
 
+# Build directory for all artifacts
+BUILD_DIR = build
+
 # Kernel headers path - use the Linux source tree
 PROJECT_ROOT ?= ../..
-HEADERS ?= -I$(PROJECT_ROOT)/build/usr/include
+HEADERS ?= -I$(PROJECT_ROOT)/build/usr/include -I./build
 LINUX_SRC ?= $(PROJECT_ROOT)/linux-git
 # BPF_HEADERS ?= -I$(LINUX_SRC)/samples/bpf/libbpf/include
 # LIBBPF_LIBRARY_DIR ?= -L$(LINUX_SRC)/samples/bpf/libbpf
@@ -27,31 +30,30 @@ TARGET_EBPF_SRCS = $(wildcard *.bpf.c)
 TARGET_LOADER_PROGRAM = loader
 TARGET_LOADER_SRC = $(TARGET_LOADER_PROGRAM).c
 
-all: $(TARGET_EBPF_SRCS:.bpf.c=.bpf.o) $(TARGET_LOADER_PROGRAM)
+all: $(BUILD_DIR) \
+	$(BUILD_DIR)/vmlinux.h \
+	$(addprefix $(BUILD_DIR)/,$(TARGET_EBPF_SRCS:.bpf.c=.bpf.o)) \
+	$(BUILD_DIR)/$(TARGET_LOADER_PROGRAM)
 
-vmlinux.h:
-	$(BPFTOOL) btf dump file $(LINUX_SRC)/../build/vmlinux format c > vmlinux.h
+$(BUILD_DIR):
+	mkdir -p $(BUILD_DIR)
+
+$(BUILD_DIR)/vmlinux.h: $(BUILD_DIR)
+	$(BPFTOOL) btf dump file $(LINUX_SRC)/../build/vmlinux format c > $@
 
 # Compile eBPF program
-$(TARGET_EBPF_SRCS:.bpf.c=.bpf.o): %.bpf.o: %.bpf.c vmlinux.h
+$(BUILD_DIR)/%.bpf.o: %.bpf.c $(BUILD_DIR)/vmlinux.h
 	$(BPF_CC) $(BPF_CFLAGS) $(HEADERS) $(BPF_HEADERS) -c $< -o $@
 	$(BPF_CC) $(BPF_CFLAGS) $(HEADERS) $(BPF_HEADERS) -S -emit-llvm -g -O0 -c $< -o $(@:.bpf.o=.bpf.ll)
 	$(LLVM_STRIP) -g $@
-	$(LLVM_OBJDUMP) -D $@ > $(@:.bpf.o=.bpf.asm)
+	$(LLVM_OBJDUMP) -S $@ > $(@:.bpf.o=.bpf.asm)
 	$(LLVM_READELF) -a $@ > $(@:.bpf.o=.bpf.info)
 
 # Compile loader program
-$(TARGET_LOADER_PROGRAM): $(TARGET_LOADER_SRC) $(TARGET_EBPF_SRCS:.bpf.c=.bpf.o) vmlinux.h
+$(BUILD_DIR)/$(TARGET_LOADER_PROGRAM): $(TARGET_LOADER_SRC) $(addprefix $(BUILD_DIR)/,$(TARGET_EBPF_SRCS:.bpf.c=.bpf.o)) $(BUILD_DIR)/vmlinux.h
 	$(CC) $(CFLAGS) $(HEADERS) $(BPF_HEADERS) $(TARGET_LOADER_SRC) $(LOCAL_BUILD_LIB_INCLUDE) $(LOCAL_BUILD_LIB_LIB) $(LIBBPF_LIBRARY_DIR) $(LIBBPF_LIBRARY) -o $@
 
 clean:
-	rm -f $(TARGET_EBPF_SRCS:.bpf.c=.bpf.o)
-	rm -f $(TARGET_EBPF_SRCS:.bpf.c=.bpf.asm)
-	rm -f $(TARGET_EBPF_SRCS:.bpf.c=.bpf.info)
-	rm -f $(TARGET_EBPF_SRCS:.bpf.c=.bpf.ll)
-	rm -f $(TARGET_LOADER_PROGRAM)
-	rm -f $(TARGET_LOADER_PROGRAM).o
-	rm -f $(TARGET_LOADER_PROGRAM).d
-	rm -f vmlinux.h
+	rm -rf $(BUILD_DIR)
 
 .PHONY: all clean 

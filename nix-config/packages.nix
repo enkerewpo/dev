@@ -32,6 +32,5 @@ with pkgs; [
   zlib
   zstd
   bpftools
-  # bpftrace
-  # bpftop
+  ecc
 ] 
