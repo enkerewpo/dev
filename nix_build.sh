@@ -63,6 +63,16 @@ show_progress() {
 ARCH=""
 SKIP_NIX=false
 EXPAND_SIZE="8G"
+BUILD_CORES=4
+
+cleanup() {
+    if [ -f ../nixpkgs/nixos/modules/installer/sd-card/sd-image-loongarch64.nix ]; then
+        rm -f ../nixpkgs/nixos/modules/installer/sd-card/sd-image-loongarch64.nix
+    fi
+    log_success "cleanup completed"
+}
+
+trap cleanup EXIT
 
 # Function to display usage
 usage() {
@@ -71,6 +81,7 @@ usage() {
     echo -e "  ${CYAN}-t, --target ARCH${NC}    Target architecture (aarch64, loongarch64)"
     echo -e "  ${CYAN}-s, --skip-nix${NC}       Skip nix build step"
     echo -e "  ${CYAN}-e, --expand SIZE${NC}    Expand root partition to SIZE (e.g., 4G, 8G) [default: 8G]"
+    echo -e "  ${CYAN}-c, --cores NUM${NC}      Build with NUM cores [default: 8]"
     echo -e "  ${CYAN}-h, --help${NC}           Display this help message"
     echo ""
     echo -e "${WHITE}Examples:${NC}"
@@ -94,6 +105,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         -e|--expand)
             EXPAND_SIZE="$2"
+            shift 2
+            ;;
+        -c|--cores)
+            BUILD_CORES="$2"
             shift 2
             ;;
         -h|--help)
@@ -145,9 +160,11 @@ make -C linux-git ARCH="$(to_linux_arch "$ARCH")" mrproper || exit 1
 if [ "$SKIP_NIX" = false ]; then
     log_step "building nix image for $ARCH..."
     if [ "$ARCH" == "aarch64" ]; then
-        nix-build aarch64.nix --show-trace --log-format bar -A image --out-link image
+        nix-build aarch64.nix --show-trace --log-format bar -A image --out-link image --cores "$BUILD_CORES"
     elif [ "$ARCH" == "loongarch64" ]; then
-        nix-build loongarch.nix --show-trace --log-format bar -A image --out-link image
+        cp ./sd-image-loongarch64.nix ../nixpkgs/nixos/modules/installer/sd-card/sd-image-loongarch64.nix
+        nix-build loongarch.nix --show-trace --log-format bar -A image --out-link image --cores "$BUILD_CORES"
+        rm -f ../nixos/modules/installer/sd-card/sd-image-loongarch64.nix
     fi
     log_success "nix image built successfully"
 else

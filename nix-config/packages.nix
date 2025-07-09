@@ -32,5 +32,5 @@ with pkgs; [
   zlib
   zstd
   bpftools
-  ecc
+  # ecc
 ] 
