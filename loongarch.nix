@@ -15,7 +15,7 @@ in {
       boot.kernelPackages = pkgs.linuxKernel.packages.linux_local;
       boot.initrd.enable = false;
       boot.initrd.kernelModules = [];
-      environment.systemPackages = import ./nix-config/packages.nix { inherit pkgs; };
+      environment.systemPackages = import ./packages/wheatfox.nix { inherit pkgs; };
       
       users.users = {
         wheatfox = {

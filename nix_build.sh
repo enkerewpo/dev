@@ -424,6 +424,13 @@ copy_linux_src() {
     log_success "linux source copied to root /usr/src/linux"
 }
 
+copy_linux_headers() {
+    LINUX_HEADERS_DIR="build/usr/include"
+    log_progress "copying linux headers to root /usr/include..."
+    sudo cp -r "$LINUX_HEADERS_DIR" "$ROOT_MOUNT/usr/"
+    log_success "linux headers copied to root /usr/include"
+}
+
 mount_image
 
 # Analyze filesystem usage
@@ -436,6 +443,7 @@ sudo find "$ROOT_MOUNT" -type f -exec du -h {} + 2>/dev/null | sort -hr | head -
 
 copy_modules
 copy_libbpf
+copy_linux_headers
 # copy_linux_src
 
 log_success "all operations completed successfully!"

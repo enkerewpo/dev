@@ -1,0 +1,38 @@
+wheatfox
+
+LOGS
+====
+
+kprobe:
+
+(base) ➜  linux-dev git:(main) ✗ sudo perf probe do_sys_open+0x9 
+Added new event:
+  probe:do_sys_open    (on do_sys_open+9)
+
+You can now use it in all perf tools, such as:
+
+        perf record -e probe:do_sys_open -aR sleep 1
+
+[wheatfox@nixos:/mnt/ebpf-programs]$ sudo bpftool prog load build/test_kprobe.bpf.o /sys/fs/bpf/test_kprobe autoattach;
+
+[wheatfox@nixos:/mnt/ebpf-programs]$ sudo bpftool prog trace log;
+   systemd-udevd-257     [000] ...21    57.353359: bpf_trace_printk: KPROBE ENTRY pid = 257, filename = /run/udev/queue
+
+   systemd-udevd-257     [000] ...21    60.962106: bpf_trace_printk: KPROBE ENTRY pid = 257, filename = /run/udev/queue
+
+   systemd-udevd-257     [000] ...21    60.966107: bpf_trace_printk: KPROBE ENTRY pid = 257, filename = /run/udev/queue
+
+   systemd-udevd-257     [000] ...21    64.959276: bpf_trace_printk: KPROBE ENTRY pid = 257, filename = /run/udev/queue
+
+
+sudo bpftool prog list
+...
+147: kprobe  name raw_kprobe_offset_sys_open  tag bf04922d3803e686  gpl
+        loaded_at 2025-07-10T01:19:05+0000  uid 0
+        xlated 152B  jited 244B  memlock 16384B  map_ids 118
+        btf_id 24
+
+NOTES
+=====
+
+https://thegraynode.io/posts/bpftool_introduction/

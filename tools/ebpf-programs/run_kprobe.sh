@@ -1,1 +1,1 @@
-# try to use ecc for ebpf compilation and loading
+sudo bpftool prog load build/test_kprobe.bpf.o /sys/fs/bpf/test_kprobe autoattach;

@@ -17,6 +17,7 @@ with pkgs; [
   gzip
   bzip2
   xz
+  tmux
   unzip
   tree
   nix
