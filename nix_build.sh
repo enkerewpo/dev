@@ -62,7 +62,7 @@ show_progress() {
 # Default values
 ARCH=""
 SKIP_NIX=false
-EXPAND_SIZE="8G"
+EXPAND_SIZE="12G"
 BUILD_CORES=4
 
 cleanup() {

@@ -31,18 +31,29 @@
       ''
         mkdir -p ./files/boot ./files/bin ./files/sbin ./files/etc ./files/var 
         mkdir -p ./files/dev ./files/run ./files/tmp ./files/proc ./files/sys
-        busybox_path=${pkgs.busybox}/bin/busybox
+        # copy busybox to bin
+        cp ${pkgs.busybox}/bin/busybox ./files/bin/busybox
+        cd ./files/bin
+        ln -sf busybox sh
+        ln -sf busybox mount
+        ln -sf busybox ls
+        ln -sf busybox mkdir
+        ln -sf busybox ln
+        ln -sf busybox rm
+        ln -sf busybox chmod
+        ln -sf busybox cat
+        ln -sf busybox head
+        ln -sf busybox echo
+        ln -sf busybox mountpoint
+        cd ../..
         ${config.boot.loader.generic-extlinux-compatible.populateCmd} -c ${config.system.build.toplevel} -d ./files/boot
-
-        ln -sf $busybox_path ./files/bin/busybox
-        ln -sf $busybox_path ./files/bin/sh
 
         # create a wrapper init at sbin
         cat > ./files/sbin/init << 'EOF'
         #!/bin/sh
         set -euo pipefail
         set -x
-        busybox_path=${pkgs.busybox}/bin/busybox
+        busybox_path=/bin/busybox
         $busybox_path echo "busybox_path: $busybox_path"
         system_path=$($busybox_path ls -d /nix/store/*-nixos-system-* | $busybox_path head -n1)
         $busybox_path echo -e "\033[1;33mmounting essential filesystems\033[0m"
