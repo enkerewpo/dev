@@ -8,7 +8,7 @@
 char LICENSE[] SEC("license") = "Dual BSD/GPL";
 
 
-SEC("kprobe/do_sys_open+0x8")
+SEC("kprobe/do_sys_open")
 int raw_kprobe_offset_sys_open(struct pt_regs *ctx) {
     pid_t pid = bpf_get_current_pid_tgid() >> 32;
     const char *filename;

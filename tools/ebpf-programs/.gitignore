@@ -8,3 +8,5 @@ ebpf1
 vmlinux.h
 *.info
 loader
+package.json
+*.skel.json
