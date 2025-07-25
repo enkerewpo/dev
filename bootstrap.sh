@@ -74,7 +74,7 @@ readonly BUILD_DIR=$(realpath "build")  # New build directory for output, we use
 
 # Dynamic configuration (these should not be readonly)
 USE_LLVM=${USE_LLVM:-1} # Can be overridden by environment variable, default is 0 because atomics intrinsics for loongarch "+BZ" is only supported in GCC now
-LLVM_HOME=${LLVM_HOME:-"/usr/lib/llvm-19/bin"}
+LLVM_HOME=${LLVM_HOME:-"$(dirname $(which clang))"}
 NUM_JOBS=$(nproc)
 
 # Variables for workspace paths (will be set in setup_workspace)
