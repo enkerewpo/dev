@@ -23,15 +23,24 @@ endif
 
 export ARCH LINUX_ARCH LINUX_DEFCONFIG
 
-all: kernel rootfs
+all: kernel-config kernel-build rootfs
 
-.PHONY: kernel
+.PHONY: kernel-config
 # we use clang toolchain to build the kernel and rootfs
-kernel:
+kernel-config:
 	make -C $(LINUX_SRC_DIR) ARCH=$(LINUX_ARCH) LLVM=1 $(LINUX_DEFCONFIG)
+
+.PHONY: kernel-build
+kernel-build:
+	time make -C $(LINUX_SRC_DIR) ARCH=$(LINUX_ARCH) LLVM=1 -j$(NUM_JOBS)
+
+.PHONY: kernel-menuconfig
+kernel-menuconfig:
+	make -C $(LINUX_SRC_DIR) ARCH=$(LINUX_ARCH) LLVM=1 menuconfig
 
 .PHONY: rootfs
 rootfs:
+	@echo "rootfs"
 
 .PHONY: run
 run:
@@ -40,3 +49,5 @@ run:
 .PHONY: clean
 clean:
 	rm -rf build
+	if [ -d $(LINUX_SRC_DIR)/Documentation/Kbuild ]; then rm -rf $(LINUX_SRC_DIR)/Documentation/Kbuild; fi
+	make -C $(LINUX_SRC_DIR) ARCH=$(LINUX_ARCH) clean

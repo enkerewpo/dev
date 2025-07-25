@@ -5,6 +5,7 @@ set -euo pipefail
 IMAGE_NAME="kernel-dev-macos"
 CONTAINER_NAME="kernel-dev-macos-container"
 WORKDIR="."
+LINUX_SRC_DIR="${WORKDIR}/../linux-6.16-rc7"
 
 show_help() {
     echo "Usage: $0 <command>"
@@ -15,7 +16,10 @@ build_image() {
 }
 
 run_container() {
-    docker run -it --name ${CONTAINER_NAME} -v ${WORKDIR}:/root/ ${IMAGE_NAME}
+    docker run -it --name ${CONTAINER_NAME} \
+        -v ${WORKDIR}:/root/workspace \
+        -v ${LINUX_SRC_DIR}:/root/linux \
+        ${IMAGE_NAME}
 }
 
 stop_container() {
