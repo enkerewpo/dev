@@ -5,7 +5,7 @@
 ARCH ?= aarch64
 LINUX_ARCH ?= $(ARCH)
 LINUX_DEFCONFIG ?= defconfig
-LINUX_SRC_DIR ?= linux
+LINUX_SRC_DIR ?= ../linux
 NUM_JOBS ?= $(shell nproc)
 
 ifeq ($(ARCH),x86_64)
